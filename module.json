@@ -15,6 +15,7 @@
       { "id": "overview", "label": "Processors" },
       { "id": "alerts", "label": "Alerts" },
       { "id": "outputs", "label": "Loops & tiles" },
+      { "id": "topology", "label": "Topology" },
       { "id": "setup", "label": "Setup" }
     ]
   }

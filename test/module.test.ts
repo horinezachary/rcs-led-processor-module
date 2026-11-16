@@ -49,7 +49,7 @@ async function coex() {
 const entry = (id: string, kind: 'brompton' | 'coex', port: number) => ({ id, kind, host: '127.0.0.1', port, label: '', portCapacity: 0 });
 
 async function start(processors: Config['processors'], extra: { allow?: boolean; state?: State; reason?: 'boot' | 'restore' | 'user' } = {}) {
-  const config: Config = { processors, thresholds: DEFAULT_THRESHOLDS, allowControls: extra.allow ?? false };
+  const config: Config = { processors, thresholds: DEFAULT_THRESHOLDS, walls: [], allowControls: extra.allow ?? false };
   sim = await startTestModule(mod, { config, state: extra.state, reason: extra.reason });
   await sim.settle();
   await until(() => last()?.processors?.length === processors.length && last().processors.every((p: any) => p.reachable), 5000, 'for the processors');
@@ -226,7 +226,7 @@ describe('setup', () => {
     const { t, port } = await tessera();
     const { c, port: cport } = await coex();
     process.env.RCS_LED_SCAN = `127.0.0.1:${port},127.0.0.1:${cport}`;
-    sim = await startTestModule(mod, { config: { processors: [], thresholds: DEFAULT_THRESHOLDS, allowControls: false } });
+    sim = await startTestModule(mod, { config: { processors: [], thresholds: DEFAULT_THRESHOLDS, walls: [], allowControls: false } });
     await sim.settle();
     expect(sim.status?.connection).toBe('disconnected');
     await sim.sendUi({ type: 'scan' });

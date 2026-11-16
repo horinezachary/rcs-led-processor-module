@@ -52,6 +52,70 @@
       .limits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
       .setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; align-items: start; }
       .toggle { display: flex; align-items: center; gap: 14px; font-size: 16px; }
+
+      /* topology: the processor that normally drives the wall on top, its backup underneath, distribution boxes as
+         columns and each tile chain as a row between a pair of boxes. Solid where signal is driven, dashed where a
+         path is standby, red where it is lost. */
+      .topo-page { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+      @media (max-width: 1600px) { .topo-page { grid-template-columns: 1fr; } }
+      .walls { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+      .wall-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .wall-head .n { font-size: 19px; font-weight: 700; }
+      .topo { display: grid; }
+      .pbar { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--rcs-border);
+        background: var(--rcs-bg); color: var(--rcs-text); font: 14px var(--rcs-font); text-align: left; cursor: pointer; }
+      .pbar .pn { font-weight: 700; font-size: 16px; }
+      .pbar .pm { color: var(--rcs-muted); font: 13px var(--rcs-mono); }
+      .tag { height: 24px; padding: 0 10px; border-radius: 12px; font: 700 12px var(--rcs-font); display: inline-flex; align-items: center; border: 1px solid var(--rcs-border); color: var(--rcs-muted); }
+      .sel { border-color: var(--rcs-accent) !important; box-shadow: inset 0 0 0 1px var(--rcs-accent); }
+      .trunk { display: flex; justify-content: center; height: 32px; position: relative; }
+      .trunk .ln { width: 0; height: 100%; border-left: 3px solid var(--rcs-ok); }
+      .trunk.standby .ln, .trunk.unknown .ln { border-left: 3px dashed var(--rcs-muted); }
+      .trunk.lost .ln { border-left: 3px dashed var(--rcs-error); }
+      .trunk .tl { position: absolute; left: calc(50% + 8px); top: 8px; font-size: 11px; color: var(--rcs-muted); white-space: nowrap; }
+      .trunk-right .tl { left: auto; right: calc(50% + 8px); }
+      .xd { display: flex; flex-direction: column; gap: 4px; padding: 5px; border: 1px solid var(--rcs-border); border-radius: 10px; background: var(--rcs-bg); }
+      .xd.off { border-color: var(--rcs-error); }
+      .xd-head { height: 34px; display: flex; align-items: center; justify-content: center; font: 700 14px var(--rcs-font); color: var(--rcs-text); background: none;
+        border: 1px solid transparent; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+      .port { height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; background: var(--rcs-surface); font: 12px var(--rcs-mono); color: var(--rcs-muted); }
+      .port .pl { width: 30px; flex: none; color: var(--rcs-text); }
+      .port.ok { --sev: var(--rcs-ok); } .port.standby, .port.unknown { --sev: var(--rcs-muted); }
+      .port.lost { --sev: var(--rcs-error); color: var(--rcs-error); background: color-mix(in srgb, var(--rcs-error) 14%, transparent); }
+      .port .bar { flex: 1; height: 8px; min-width: 30px; }
+      .port.load-warning { background: color-mix(in srgb, var(--rcs-warn) 14%, transparent); } .port.load-critical { background: color-mix(in srgb, var(--rcs-error) 14%, transparent); }
+      .port .pct { width: 36px; text-align: right; flex: none; }
+      .lanes { display: flex; flex-direction: column; gap: 4px; padding: 5px 0; min-width: 0; }
+      .lanes .lh { height: 34px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--rcs-muted); }
+      .lane { height: 26px; display: flex; align-items: center; padding: 0; border: 1px solid transparent; border-radius: 6px; background: none; cursor: pointer; min-width: 0; }
+      .lane:hover { background: color-mix(in srgb, var(--rcs-muted) 10%, transparent); }
+      .lane .lk { flex: 1 1 10px; min-width: 6px; border-top: 2px solid var(--rcs-ok); }
+      .lane .lk.standby, .lane .lk.unknown { border-top-style: dashed; border-top-color: var(--rcs-muted); }
+      .lane .lk.lost { border-top-style: dashed; border-top-color: var(--rcs-error); }
+      .lane.single .lk { flex: 0 0 20px; }
+      .lane.single::after { content: ''; flex: 1; }
+      .lane .ts { display: flex; gap: 3px; flex: none; align-items: center; }
+      .lane .ts i { width: 14px; height: 18px; border-radius: 3px; background: color-mix(in srgb, var(--rcs-muted) 30%, transparent); border: 1px solid color-mix(in srgb, var(--rcs-muted) 50%, transparent); box-sizing: border-box; }
+      .lane .ts i.ok { background: color-mix(in srgb, var(--rcs-ok) 25%, transparent); border-color: color-mix(in srgb, var(--rcs-ok) 60%, transparent); }
+      .lane .ts i.warning { background: color-mix(in srgb, var(--rcs-warn) 40%, transparent); border-color: var(--rcs-warn); }
+      .lane .ts i.critical { background: color-mix(in srgb, var(--rcs-error) 40%, transparent); border-color: var(--rcs-error); }
+      .lane .more { font: 11px var(--rcs-mono); color: var(--rcs-muted); margin-left: 4px; }
+      .lane.warning { background: color-mix(in srgb, var(--rcs-warn) 10%, transparent); }
+      .detail h4 { margin: 0; font-size: 18px; }
+      .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--rcs-muted); }
+      .legend span { display: inline-flex; align-items: center; gap: 6px; }
+      .legend .k { width: 22px; border-top: 3px solid var(--rcs-ok); }
+      .legend .k.standby { border-top-style: dashed; border-top-color: var(--rcs-muted); } .legend .k.lost { border-top-style: dashed; border-top-color: var(--rcs-error); }
+
+      /* wall editor */
+      .wall-edit { border: 1px solid var(--rcs-border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+      .wall-edit .row label.f { flex: 1 1 200px; }
+      .group-edit { border-top: 1px solid var(--rcs-border); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+      .box-edit { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+      .box-edit label.f { flex: 1 1 120px; }
+      .box-edit label.f.short { flex: 0 1 90px; }
+      .cells { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cells label.f { width: 72px; font: 12px var(--rcs-mono); }
     </style>
   </head>
   <body>
@@ -80,6 +144,13 @@
       <div id="outBody" class="two"></div>
     </section>
 
+    <section id="page-topology" hidden>
+      <div class="topo-page">
+        <div class="walls" id="walls"></div>
+        <div class="card detail" id="topoSide"></div>
+      </div>
+    </section>
+
     <section id="page-setup" hidden>
       <div class="setup">
         <div class="card">
@@ -103,6 +174,13 @@
         </div>
       </div>
       <div class="card"><h3 id="listHead">Processors</h3><div class="scrollx"><table id="procTable"></table></div></div>
+      <div class="card">
+        <h3>Brompton walls</h3>
+        <p>Tessera does not report where its tiles are, so each Brompton wall is described here once for the Topology page: the processor pair, and for each pair of XD boxes the tiles on each port's chain. A chain runs from port N on the left box to port N on the right box as a cable loop. NovaStar COEX walls come from the processor and need nothing here.</p>
+        <p>"Fill in from" starts from the XD pairs and cabled ports in the processor's last cable loop report, without asking the processor anything. Tessera does not say how many tiles are on each chain, so new chains share its tile count evenly: check each one.</p>
+        <div id="wallEdit" style="display: flex; flex-direction: column; gap: 14px"></div>
+        <div class="row"><rcs-button id="addWall">Add a wall</rcs-button><div class="grow"></div><span class="note" id="wallsDirty"></span><rcs-button id="discardWalls">Discard changes</rcs-button><rcs-button id="saveWalls" variant="primary">Save walls</rcs-button></div>
+      </div>
     </section>
 
     <rcs-dialog id="confirm">
@@ -115,7 +193,7 @@
 
     <script type="module">
       const $ = (id) => document.getElementById(id);
-      const PAGES = ['overview', 'alerts', 'outputs', 'setup'];
+      const PAGES = ['overview', 'alerts', 'outputs', 'topology', 'setup'];
       const SEV = { ok: 'OK', warning: 'Warning', critical: 'Critical', unknown: 'Unknown' };
       const KIND = { brompton: 'Brompton Tessera', coex: 'NovaStar COEX', vxpro: 'NovaStar VX Pro', device: 'Device' };
       const LIMITS = [
@@ -129,6 +207,10 @@
       let mine = ''; // this browser's processor
       let out = null; // detail from get-processor
       let onYes = null;
+      let pick = null; // what is selected on the Topology page: { kind: 'processor', wall, id } | { kind: 'box', wall, group, side } | { kind: 'chain', id }
+      let draft = null; // wall layouts being edited in Setup, until saved
+      let draftFrom = ''; // the saved layouts the draft started from
+      let dirty = false;
 
       function el(tag, attrs = {}, text) {
         const e = document.createElement(tag);
@@ -177,7 +259,7 @@
       function draw() {
         if (!s) return;
         if (!proc(mine)) mine = s.current || s.processors[0]?.id || '';
-        ({ overview: drawOverview, alerts: drawAlerts, outputs: drawOutputs, setup: drawSetup })[page]();
+        ({ overview: drawOverview, alerts: drawAlerts, outputs: drawOutputs, topology: drawTopology, setup: drawSetup })[page]();
       }
 
       function spark(points, limit) {
@@ -442,6 +524,327 @@
       }
       $('outProc').onchange = () => { mine = $('outProc').value; out = null; want(); draw(); };
 
+      // ---- topology ----
+      const LINK = { ok: 'driving', standby: 'standby', lost: 'lost', unknown: 'not known' };
+      const PORT = { ok: 'Driving', standby: 'Ready', lost: 'Lost', unknown: '–' };
+      const MAX_TILES = 16;
+      const plural = (n, w) => `${n} ${w}${n === 1 ? '' : w.endsWith('x') ? 'es' : 's'}`;
+      const choose = (x) => { pick = x; drawTopology(); };
+      const same = (a, b) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
+
+      function wallSummary(w) {
+        const chains = w.groups.reduce((n, g) => n + g.chains.length, 0);
+        const tiles = w.groups.reduce((n, g) => n + g.chains.reduce((m, c) => m + c.tileCount, 0), 0);
+        const boxes = w.groups.reduce((n, g) => n + (g.right ? 2 : 1), 0);
+        return [w.backup ? 'Redundant pair' : 'Single processor', w.source === 'layout' ? plural(boxes, 'distribution box') : plural(boxes, 'output group'), plural(chains, 'chain'), plural(tiles, 'tile')].join(' · ');
+      }
+
+      function drawTopology() {
+        const host = $('walls');
+        host.replaceChildren();
+        if (!s.walls.length) {
+          const c = el('div', { class: 'card' });
+          c.append(el('h3', {}, 'No walls to draw yet'), el('p', {}, 'NovaStar COEX walls are drawn from the processor\'s own cabinet map. A Brompton wall needs a layout: add one under Brompton walls in Setup, naming the processor pair and the tiles on each port of each XD box.'));
+          host.append(c);
+        }
+        for (const w of s.walls) host.append(wallCard(w));
+        drawTopoSide();
+      }
+
+      function wallCard(w) {
+        const card = el('div', { class: 'card ' + w.severity });
+        const head = el('div', { class: 'wall-head' });
+        const pill = el('span', { class: 'pill' });
+        pill.append(el('span', { class: 'dot' }), SEV[w.severity]);
+        head.append(el('span', { class: 'n' }, w.name), pill, el('span', { class: 'note' }, wallSummary(w)));
+        card.append(head);
+        for (const n of w.notes) card.append(el('p', {}, n));
+        const cols = [];
+        const at = [];
+        w.groups.forEach((g, i) => {
+          if (i > 0) cols.push('28px');
+          const left = cols.push(g.right ? 'minmax(96px, 120px)' : 'minmax(170px, 210px)');
+          const lanes = cols.push('minmax(0, 1fr)');
+          const right = g.right ? cols.push('minmax(96px, 120px)') : undefined;
+          at.push({ left, lanes, right });
+        });
+        const minWidth = w.groups.reduce((n, g) => n + (g.right ? 240 : 190) + 260, 0);
+        const grid = el('div', { class: 'topo', style: `grid-template-columns: ${cols.join(' ')}; min-width: ${minWidth}px` });
+        const trunkCol = (t) => (t.side === 'left' ? at[t.group].left : at[t.group].right ?? at[t.group].left);
+        const trunk = (state, col, row, label, side) => {
+          const d = el('div', { class: `trunk ${state} trunk-${side}`, style: `grid-column: ${col}; grid-row: ${row}` });
+          d.append(el('div', { class: 'ln' }), el('span', { class: 'tl' }, `${label} · ${LINK[state]}`));
+          return d;
+        };
+        grid.append(procBar(w, w.primary, 1));
+        for (const t of w.trunks) grid.append(trunk(t.fromPrimary, trunkCol(t), 2, t.label, t.side));
+        w.groups.forEach((g, gi) => {
+          grid.append(xdBox(w, g, gi, 'left', at[gi].left));
+          const lanes = el('div', { class: 'lanes', style: `grid-column: ${at[gi].lanes}; grid-row: 3` });
+          lanes.append(el('div', { class: 'lh' }, g.right ? 'TILE CHAINS · LOOPED' : 'TILE CHAINS'));
+          for (const c of g.chains) lanes.append(lane(c));
+          grid.append(lanes);
+          if (g.right) grid.append(xdBox(w, g, gi, 'right', at[gi].right));
+        });
+        if (w.backup) {
+          for (const t of w.trunks) grid.append(trunk(t.fromBackup ?? 'unknown', trunkCol(t), 4, t.label, t.side));
+          grid.append(procBar(w, w.backup, 5));
+        }
+        const sc = el('div', { class: 'scrollx' });
+        sc.append(grid);
+        card.append(sc);
+        return card;
+      }
+
+      function procBar(w, p, row) {
+        const me = { kind: 'processor', wall: w.id, id: p.id };
+        const b = el('button', { class: 'pbar ' + p.severity + (same(pick, me) ? ' sel' : ''), style: `grid-row: ${row}`, 'aria-pressed': same(pick, me) });
+        const state = !p.reachable ? 'Offline' : p.driving ? 'Driving the wall' : p.role === 'backup' ? 'Standby' : 'Not driving';
+        const sev = !p.reachable ? 'critical' : p.driving ? (p.role === 'backup' ? 'warning' : 'ok') : 'unknown';
+        const pill = el('span', { class: 'pill ' + sev });
+        pill.append(state);
+        b.append(el('span', { class: 'dot' }), el('span', { class: 'pn' }, p.name));
+        if (p.role !== 'single') b.append(el('span', { class: 'tag' }, p.role === 'primary' ? 'Primary' : 'Backup'));
+        b.append(pill, el('span', { class: 'pm' }, p.summary));
+        b.onclick = () => choose(me);
+        return b;
+      }
+
+      function xdBox(w, g, gi, side, col) {
+        const box = g[side];
+        const me = { kind: 'box', wall: w.id, group: gi, side };
+        const d = el('div', { class: 'xd' + (box.online === false ? ' off' : ''), style: `grid-column: ${col}; grid-row: 3` });
+        const h = el('button', { class: 'xd-head' + (same(pick, me) ? ' sel' : ''), 'aria-pressed': same(pick, me) }, box.name);
+        h.onclick = () => choose(me);
+        d.append(h);
+        for (const c of g.chains) {
+          const p = side === 'left' ? c.from : c.to ?? { label: '', state: 'unknown' };
+          const lsev = p.load ? (p.load.percent > 100 ? 'critical' : p.load.percent >= s.thresholds.portLoadWarnPercent ? 'warning' : 'ok') : '';
+          const r = el('div', { class: `port ${p.state}${lsev && lsev !== 'ok' ? ' load-' + lsev : ''}`, title: p.load ? `${fmt(p.load.pixels)} of ${fmt(p.load.capacity)} pixels` : null });
+          r.append(el('span', { class: 'pl' }, p.label));
+          if (p.load) {
+            const bar = el('span', { class: 'bar ' + lsev });
+            bar.append(el('b', { style: `width: ${Math.min(100, p.load.percent)}%` }));
+            r.append(bar, el('span', { class: 'pct' }, `${Math.round(p.load.percent)}%`));
+          } else r.append(el('span', { class: 'dot' }), PORT[p.state]);
+          d.append(r);
+        }
+        return d;
+      }
+
+      function lane(c) {
+        const end = c.loop === 'broken' ? 'lost' : c.loop === 'none' ? 'none' : 'standby';
+        const me = { kind: 'chain', id: c.id };
+        const b = el('button', { class: `lane ${c.severity === 'warning' || c.severity === 'critical' ? c.severity : ''}${end === 'none' ? ' single' : ''}${same(pick, me) ? ' sel' : ''}`, 'aria-label': `Chain ${c.label}, ${c.tileCount} tiles, ${SEV[c.severity]}`, 'aria-pressed': same(pick, me) });
+        b.append(el('span', { class: 'lk ' + c.from.state }));
+        const ts = el('span', { class: 'ts' });
+        for (const t of c.tiles.slice(0, MAX_TILES)) ts.append(el('i', { class: t.severity, title: t.label ? `${t.label}${t.detail ? ': ' + t.detail : ''}` : null }));
+        if (c.tileCount > MAX_TILES) ts.append(el('span', { class: 'more' }, `+${c.tileCount - MAX_TILES}`));
+        b.append(ts);
+        if (end !== 'none') b.append(el('span', { class: 'lk ' + end }));
+        b.onclick = () => choose(me);
+        return b;
+      }
+
+      function kv(rows) {
+        const dl = el('dl');
+        for (const [k, v, bad] of rows) dl.append(el('dt', {}, k), el('dd', { style: bad ? 'color: var(--rcs-error)' : null }, v || '–'));
+        return dl;
+      }
+
+      function drawTopoSide() {
+        const side = $('topoSide');
+        side.replaceChildren(el('h3', {}, 'Selected'));
+        const body = pickDetail();
+        if (body) side.append(...body);
+        else side.append(el('p', {}, 'Choose a processor, distribution box or chain to see its details.'));
+        const lg = el('div', { class: 'legend' });
+        for (const [cls, text] of [['ok', 'Driving'], ['standby', 'Standby or redundant end'], ['lost', 'Lost']]) {
+          const sp = el('span');
+          sp.append(el('span', { class: 'k ' + cls }), text);
+          lg.append(sp);
+        }
+        side.append(lg, el('p', { class: 'note', style: 'font-size: 13px' }, 'Port loads show where the processor reports enough to work them out (COEX). Brompton walls show link state only.'));
+      }
+
+      function pickDetail() {
+        if (!pick) return null;
+        if (pick.kind === 'processor') {
+          const p = proc(pick.id);
+          if (!p) return null;
+          const out = [el('h4', {}, p.name), el('p', {}, `${p.model || KIND[p.kind]} · ${p.host}`)];
+          out.push(kv([
+            ['State', p.reachable ? SEV[p.severity] : 'Offline', p.severity === 'critical' || p.severity === 'warning'],
+            ['Redundancy', p.redundancy],
+            ['Input', p.input, !p.inputOk],
+            ['Hottest sensor', p.hottest ? `${p.hottest.label} ${p.hottest.value.toFixed(1)} °C` : ''],
+            ['Fans', p.fans, !p.fansOk],
+            ['Tiles', p.tiles ? `${fmt(p.tiles.online)} of ${fmt(p.tiles.associated)} online` : '', p.tiles && p.tiles.online < p.tiles.associated],
+            ['Firmware', p.firmware]
+          ]));
+          for (const a of p.alerts) {
+            const d = el('div', { class: 'alert ' + a.severity });
+            d.append(el('span', { class: 'dot' }), a.message);
+            out.push(d);
+          }
+          return out;
+        }
+        if (pick.kind === 'box') {
+          const w = s.walls.find((x) => x.id === pick.wall);
+          const g = w?.groups[pick.group];
+          const box = g?.[pick.side];
+          if (!box) return null;
+          const ports = g.chains.map((c) => (pick.side === 'left' ? c.from : c.to)).filter(Boolean);
+          const lost = ports.filter((p) => p.state === 'lost').map((p) => p.label);
+          return [el('h4', {}, box.name), el('p', {}, w.name), kv([
+            ['Fed by', box.trunk ? `Trunk ${box.trunk}` : ''],
+            ['Seen by the processor', box.online === undefined ? 'Not checked (no serial in the layout)' : box.online ? 'Yes' : 'No', box.online === false],
+            ['Firmware', box.firmware],
+            ['Ports in use', String(ports.length)],
+            ['Ports lost', lost.join(', ') || 'None', lost.length > 0]
+          ])];
+        }
+        for (const w of s.walls) {
+          for (const g of w.groups) {
+            const c = g.chains.find((x) => x.id === pick.id);
+            if (!c) continue;
+            const loop = { ok: 'Loop confirmed by the processor', broken: 'Broken: the redundant end is lost', unknown: 'Not reported by the processor', none: 'Single-ended chain' }[c.loop];
+            const bad = c.tiles.filter((t) => t.severity === 'warning' || t.severity === 'critical');
+            const rows = [['Driven from', `${g.left.name} port ${c.from.label}`]];
+            if (c.to && g.right) rows.push(['Redundant end', `${g.right.name} port ${c.to.label} · ${PORT[c.to.state].toLowerCase()}`, c.to.state === 'lost']);
+            rows.push(['Cable loop', loop, c.loop === 'broken']);
+            if (c.from.load) rows.push(['Port load', `${Math.round(c.from.load.percent)}% · ${fmt(c.from.load.pixels)} of ${fmt(c.from.load.capacity)} px`, c.from.load.percent >= s.thresholds.portLoadWarnPercent]);
+            rows.push(['Tiles', bad.length ? `${bad.length} with problems` : c.tiles.some((t) => t.severity === 'ok') ? 'All OK' : 'Count only', bad.length > 0]);
+            const out = [el('h4', {}, `Chain ${c.label}`), el('p', {}, `${w.name} · ${plural(c.tileCount, 'tile')}`), kv(rows)];
+            for (const t of bad) {
+              const d = el('div', { class: 'alert ' + t.severity });
+              d.append(el('span', { class: 'dot' }), `${t.label ?? t.id}${t.detail ? ' · ' + t.detail : ''}`);
+              out.push(d);
+            }
+            for (const n of c.notes) out.push(el('p', {}, n));
+            return out;
+          }
+        }
+        return null;
+      }
+
+      // ---- wall layouts (Setup) ----
+      const bromptons = () => s.entries.filter((e) => e.kind === 'brompton');
+      const entryName = (e) => proc(e.id)?.name || e.label || e.host;
+      const newGroup = (a, b) => ({ left: { name: `XD ${a}`, trunk: a, ports: 10 }, right: { name: `XD ${b}`, trunk: b, ports: 10 }, chains: Array(10).fill(0) });
+      const markDirty = () => { dirty = true; $('wallsDirty').textContent = 'Not saved yet'; };
+      const restructure = (fn) => { fn(); markDirty(); drawWallEditor(); };
+
+      function input(attrs, value, onInput) {
+        const i = el('input', { ...attrs, value: value ?? '' });
+        i.addEventListener('input', () => { onInput(i.value); markDirty(); });
+        return i;
+      }
+      function field(label, control, cls = '') {
+        const f = el('label', { class: 'f ' + cls }, label);
+        f.append(control);
+        return f;
+      }
+      function procChoice(value, allowNone, exclude, onChange) {
+        const sel = el('select');
+        if (allowNone) sel.append(el('option', { value: '' }, 'None'));
+        for (const e of bromptons()) if (e.id !== exclude) sel.append(el('option', { value: e.id, selected: e.id === value }, entryName(e)));
+        sel.value = value ?? '';
+        sel.onchange = () => restructure(() => onChange(sel.value));
+        return sel;
+      }
+
+      function syncDraft() {
+        const saved = JSON.stringify(s.layouts);
+        if (!dirty && saved !== draftFrom) {
+          draft = structuredClone(s.layouts);
+          draftFrom = saved;
+          drawWallEditor();
+        }
+      }
+
+      function drawWallEditor() {
+        const host = $('wallEdit');
+        host.replaceChildren();
+        $('wallsDirty').textContent = dirty ? 'Not saved yet' : '';
+        $('addWall').toggleAttribute('disabled', !bromptons().length);
+        if (!bromptons().length) host.append(el('p', {}, 'Add a Brompton processor first.'));
+        draft.forEach((w, wi) => {
+          const box = el('div', { class: 'wall-edit' });
+          const head = el('div', { class: 'row' });
+          const primary = proc(w.primary);
+          head.append(el('h3', { class: 'grow' }, w.name || 'Wall'),
+            button(`Fill in from ${primary?.name ?? 'the processor'}`, undefined, () => rcs.send({ type: 'suggest-wall', ref: wi, primary: w.primary, groups: w.groups }), !primary?.reachable),
+            button('Remove wall', 'danger', () => restructure(() => draft.splice(wi, 1))));
+          const top = el('div', { class: 'row' });
+          top.append(
+            field('Name', input({ type: 'text', maxlength: 40 }, w.name, (v) => (w.name = v))),
+            field('Primary processor', procChoice(w.primary, false, null, (v) => { w.primary = v; if (w.backup === v) delete w.backup; })),
+            field('Backup processor', procChoice(w.backup, true, w.primary, (v) => { if (v) w.backup = v; else delete w.backup; }))
+          );
+          box.append(head, top);
+          w.groups.forEach((g, gi) => box.append(groupEditor(w, g, gi)));
+          const foot = el('div', { class: 'row' });
+          const n = w.groups.reduce((a, g) => a + g.chains.filter((c) => c > 0).length, 0);
+          const t = w.groups.reduce((a, g) => a + g.chains.reduce((x, y) => x + y, 0), 0);
+          foot.append(button('Add a pair of boxes', undefined, () => restructure(() => { const k = w.groups.length * 2; w.groups.push(newGroup(String.fromCharCode(65 + k), String.fromCharCode(66 + k))); })),
+            el('span', { class: 'note', 'data-count': wi }, `${plural(n, 'chain')}, ${plural(t, 'tile')} in this layout`));
+          box.append(foot);
+          host.append(box);
+        });
+      }
+
+      function groupEditor(w, g, gi) {
+        const d = el('div', { class: 'group-edit' });
+        const boxFields = (side) => {
+          const b = g[side];
+          const r = el('div', { class: 'box-edit' });
+          r.append(
+            el('span', { class: 'note', style: 'flex: 0 0 150px' }, side === 'left' ? 'Left box (drives the chains)' : 'Right box (loop end)'),
+            field('Name', input({ type: 'text', maxlength: 30 }, b.name, (v) => (b.name = v))),
+            field('Trunk', input({ type: 'text', maxlength: 2 }, b.trunk, (v) => { if (v.trim()) b.trunk = v.trim().toUpperCase(); else delete b.trunk; }), 'short'),
+            field('Ports', (() => { const i = el('input', { type: 'number', min: 1, max: 32, value: b.ports ?? 10 }); i.onchange = () => restructure(() => (b.ports = Math.max(1, Math.min(32, Number(i.value) || 10)))); return i; })(), 'short'),
+            field('Serial (optional)', input({ type: 'text', maxlength: 64 }, b.serial, (v) => { if (v.trim()) b.serial = v.trim(); else delete b.serial; }))
+          );
+          return r;
+        };
+        const head = el('div', { class: 'row' });
+        const loop = el('rcs-toggle', { label: 'Chains loop back to a second box' });
+        loop.checked = !!g.right;
+        loop.addEventListener('change', (e) => restructure(() => { if (e.detail) g.right = { name: 'XD', ports: g.left.ports ?? 10 }; else delete g.right; }));
+        const lt = el('label', { class: 'toggle', style: 'font-size: 14px' });
+        lt.append(loop, 'Chains loop back to a second box');
+        head.append(el('h3', { class: 'grow' }, `Box pair ${gi + 1}`), lt, button('Remove pair', undefined, () => restructure(() => w.groups.splice(gi, 1))));
+        d.append(head, boxFields('left'));
+        if (g.right) d.append(boxFields('right'));
+        const ports = Math.min(g.left.ports ?? 10, g.right?.ports ?? Infinity);
+        while (g.chains.length < ports) g.chains.push(0);
+        g.chains.length = ports;
+        d.append(el('span', { class: 'note' }, 'Tiles on each port (0 for an empty port)'));
+        const cells = el('div', { class: 'cells' });
+        g.chains.forEach((c, i) => cells.append(field(`${g.left.trunk ?? ''}${i + 1}`, input({ type: 'number', min: 0, max: 500 }, c, (v) => { g.chains[i] = Math.max(0, Math.floor(Number(v) || 0)); recount(); }))));
+        d.append(cells);
+        return d;
+      }
+
+      function recount() {
+        draft.forEach((w, wi) => {
+          const span = document.querySelector(`[data-count="${wi}"]`);
+          if (!span) return;
+          const n = w.groups.reduce((a, g) => a + g.chains.filter((c) => c > 0).length, 0);
+          const t = w.groups.reduce((a, g) => a + g.chains.reduce((x, y) => x + y, 0), 0);
+          span.textContent = `${plural(n, 'chain')}, ${plural(t, 'tile')} in this layout`;
+        });
+      }
+
+      $('addWall').onclick = () => {
+        const list = bromptons();
+        if (!list.length) return;
+        restructure(() => draft.push({ name: `Wall ${draft.length + 1}`, primary: list[0].id, ...(list[1] ? { backup: list[1].id } : {}), groups: [newGroup('A', 'B')] }));
+      };
+      $('saveWalls').onclick = () => rcs.send({ type: 'walls', walls: draft });
+      $('discardWalls').onclick = () => { dirty = false; draftFrom = ''; syncDraft(); };
+
       function drawSetup() {
         $('allowControls').checked = s.allowControls;
         $('scan').textContent = s.scanning ? 'Scanning…' : 'Scan';
@@ -501,6 +904,8 @@
           r.append(dot, nm, el('td', {}, KIND[e.kind]), el('td', { class: 'mono' }, `${e.host}${e.port ? ':' + e.port : ''}${p && !p.reachable && p.lastError ? ' · ' + p.lastError : ''}`), cap, acts);
           t.append(r);
         });
+        if (!draft) { draft = []; draftFrom = '[]'; drawWallEditor(); }
+        syncDraft();
       }
 
       $('add').onclick = () => {
@@ -532,6 +937,14 @@
           s = m;
           if (first && page === 'outputs') want();
           draw();
+        } else if (m?.type === 'walls-result') {
+          // Saved: show the layouts as the module cleaned them. Refused: keep the draft to correct.
+          if (m.ok) { dirty = false; draftFrom = ''; if (s) syncDraft(); }
+        } else if (m?.type === 'wall-suggestion') {
+          const w = draft?.[m.ref];
+          if (!w) return;
+          if (m.error) return ask(m.error, 'OK', 'primary', () => {});
+          restructure(() => { w.groups = m.groups; if (m.backup && !w.backup) w.backup = m.backup; });
         } else if (m?.type === 'processor') {
           if (m.id !== mine) return;
           out = m;

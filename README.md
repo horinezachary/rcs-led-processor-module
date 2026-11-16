@@ -13,12 +13,29 @@ come from [LEDScreenControl](https://github.com/horinezachary/LEDScreenControl).
 - **Loops**: for a Tessera, every cable loop and whether it is found, plus tile counts and tile
   firmware. For COEX, each output port with its cabinets (coloured by health and temperature) and its
   load against the port's capacity, plus the hottest tiles.
+- **Topology**: each wall as a diagram, as in LEDScreenControl. The processor that normally drives
+  the wall on top, its backup underneath, the distribution boxes as columns and each tile chain as a
+  row between a pair of boxes: solid where signal is driven, dashed where a path is standby, red where
+  it is lost. A broken Tessera cable loop is pinned to its chain. COEX walls come from the processor's
+  own cabinet map, with port loads. Brompton walls need a layout (below). Tap a processor, box or chain
+  for its details; the header tabs choose the wall on this screen only.
 - **Setup**: processors by address (or found by a network scan), Allow controls, and the alert limits.
 
 The web view has the same pages with more detail: every temperature and fan, a temperature chart,
 the controls (brightness slider, presets, input, blackout, freeze, failover, reboot, COEX error count
 reset), the event log with filters, distribution boxes and the processor list with names, order and
 COEX port capacity.
+
+### Brompton wall layouts
+
+Tessera reports processor health, failover and cable loops but not where tiles are, so each Brompton
+wall is described once under **Brompton walls** in the web view's Setup: the processor pair, and for
+each pair of XD boxes the trunk letters and the tiles on each port's chain (a chain runs from port N
+on the left box to port N on the right box). **Fill in from** starts from the XD pairs and cabled ports
+in the processor's last cable loop report, without asking the processor anything; Tessera does not say
+how many tiles are on a chain, so check the even share it suggests. Layouts are the module's own config
+and go into named saves. A wall goes away with its primary processor; removing its backup keeps it as
+a single-processor wall.
 
 ## Stream Deck
 
@@ -112,9 +129,10 @@ It needs two Actions secrets:
 | `src/drivers/` | Tessera, COEX, VX Pro and plain device drivers (from LEDScreenControl) |
 | `src/rules.ts`, `src/thresholds.ts` | Health rules and alert limits |
 | `src/scan.ts` | The read-only network scan |
+| `src/topology.ts`, `src/walls.ts` | Wall diagrams from layouts and readings, and the wall layout checks |
 | `src/shared.ts` | The processor reading shapes every driver produces |
 | `src/sim/`, `src/sim-cli.ts` | Simulated processors with switchable faults |
-| `ui/index.html` | The panel UI: Overview, Alerts, Loops, Setup |
-| `web/index.html` | The web view's pages: Processors, Alerts, Loops & tiles, Setup |
+| `ui/index.html` | The panel UI: Overview, Alerts, Loops, Topology, Setup |
+| `web/index.html` | The web view's pages: Processors, Alerts, Loops & tiles, Topology, Setup |
 | `test/fixtures/` | Read-only captures from a real Tessera SX40 and a real CX40 Pro |
 | `scripts/link-sdk.mjs` | Links `@rcs/*` from a main repo checkout |
