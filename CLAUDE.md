@@ -1,7 +1,7 @@
 # LED Processor Monitor module
 
 A Rack Control Surface module; see README.md. Built like the other module repos (rcs-netgearAV-module,
-rcs-unifi-viewer): SDK linked from a rack-control-surface checkout, signed releases on every merge to main.
+rcs-unifi-viewer): SDK linked from a rack-control-surface checkout, signed releases on every merge to master (the default branch).
 
 ## Working agreement
 

@@ -1,4 +1,4 @@
-# Every merge to main is a release, versioned like the main repo: "feat:" in the PR title is a minor
+# Every merge to the default branch (master here) is a release, versioned like the main repo: "feat:" in the PR title is a minor
 # bump, "!:" or "BREAKING CHANGE" a major one, anything else a patch, and "[skip release]" skips it
 # (.github/scripts/next-version.sh). The first release is the version in module.json. After that the
 # tag is the version: it is stamped into module.json for the package, so nobody bumps it by hand.
@@ -9,7 +9,7 @@
 name: release
 on:
   push:
-    branches: [main]
+    branches: [main, master]
 permissions:
   contents: write
 concurrency:

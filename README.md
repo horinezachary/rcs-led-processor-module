@@ -88,7 +88,7 @@ at the top of each file in `src/sim`). `RCS_LED_POLL_MS` polls faster during dev
 
 ## Releasing
 
-Every merge to `main` is a release (`.github/workflows/release.yml`), versioned from the PR title:
+Every merge to `master` (the default branch) is a release (`.github/workflows/release.yml`), versioned from the PR title:
 `feat:` is a minor bump, `!:` or `BREAKING CHANGE` a major one, anything else a patch; `[skip release]`
 skips it. The workflow tests, stamps the version into `module.json`, packs, signs and publishes
 `led-monitor-<version>.zip` and its `.sig` as a GitHub release here, where units find it through the
