@@ -79,6 +79,67 @@
       .bar b { display: block; height: 100%; background: var(--sev); }
       .load { display: flex; flex-direction: column; gap: 3px; font: 12px var(--rcs-mono); color: var(--rcs-muted); }
 
+      /* topology: the processor that normally drives the wall on top, its backup underneath, the distribution boxes
+         as columns between them and each tile chain as a row between a pair of boxes. Solid where signal is driven,
+         dashed where a path is standby, red where it is lost. */
+      .topo-view { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 400px; gap: 16px; }
+      .wall { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+      .wall-head { display: flex; align-items: center; gap: 12px; min-height: 28px; }
+      .wall-head .n { font-size: 18px; font-weight: 700; white-space: nowrap; }
+      .wall-head .pill { height: 26px; font-size: 12.5px; }
+      .topo-scroll { flex: 1; min-height: 0; overflow: auto; }
+      .topo { display: grid; grid-template-rows: auto 10px minmax(0, 1fr) 10px auto; min-height: 100%; }
+      .topo.single { grid-template-rows: auto 10px minmax(0, 1fr); }
+      .pbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; height: 30px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--rcs-border);
+        background: var(--rcs-surface); color: var(--rcs-text); font: 14px var(--rcs-font); text-align: left; cursor: pointer; min-width: 0; }
+      .pbar .pn { font-weight: 700; font-size: 15px; white-space: nowrap; }
+      .pbar .pm { color: var(--rcs-muted); font: 13px var(--rcs-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+      .pbar .pill, .tag { height: 22px; font-size: 12px; padding: 0 9px; }
+      .tag { border-radius: 11px; font-weight: 700; display: inline-flex; align-items: center; border: 1px solid var(--rcs-border); color: var(--rcs-muted); white-space: nowrap; }
+      .sel { border-color: var(--rcs-accent) !important; box-shadow: inset 0 0 0 1px var(--rcs-accent); }
+      .trunk { display: flex; justify-content: center; }
+      .trunk .ln { width: 0; height: 100%; border-left: 3px solid var(--rcs-ok); }
+      .trunk.standby .ln, .trunk.unknown .ln { border-left: 3px dashed var(--rcs-muted); }
+      .trunk.lost .ln { border-left: 3px dashed var(--rcs-error); }
+      .xd { align-self: start; display: flex; flex-direction: column; gap: 2px; padding: 3px; border: 1px solid var(--rcs-border); border-radius: 8px; background: var(--rcs-surface); min-height: 0; overflow: hidden; }
+      .xd.off { border-color: var(--rcs-error); }
+      .xd-head { height: 22px; flex: none; display: flex; align-items: center; justify-content: center; gap: 6px; font: 700 13px var(--rcs-font); color: var(--rcs-text);
+        background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer; padding: 0 4px; white-space: nowrap; overflow: hidden; }
+      .port { height: 18px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 6px; border-radius: 4px; background: var(--rcs-bg); font: 12px var(--rcs-mono); color: var(--rcs-muted); }
+      .port .pl { width: 28px; flex: none; color: var(--rcs-text); }
+      .port .dot { width: 7px; height: 7px; }
+      .port.ok { --sev: var(--rcs-ok); } .port.standby, .port.unknown { --sev: var(--rcs-muted); }
+      .port.lost { --sev: var(--rcs-error); color: var(--rcs-error); background: color-mix(in srgb, var(--rcs-error) 14%, transparent); }
+      .port .bar { flex: 1; height: 7px; min-width: 30px; }
+      .port.load-warning { background: color-mix(in srgb, var(--rcs-warn) 14%, transparent); } .port.load-critical { background: color-mix(in srgb, var(--rcs-error) 14%, transparent); }
+      .port .pct { width: 36px; text-align: right; flex: none; }
+      .lanes { display: flex; flex-direction: column; gap: 2px; padding: 3px 0; min-width: 0; min-height: 0; overflow: hidden; }
+      .lanes .lh { height: 22px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--rcs-muted); }
+      .lane { height: 18px; flex: none; display: flex; align-items: center; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; cursor: pointer; min-width: 0; }
+      .lane .lk { flex: 1 1 10px; min-width: 6px; border-top: 2px solid var(--rcs-ok); }
+      .lane .lk.standby, .lane .lk.unknown { border-top-style: dashed; border-top-color: var(--rcs-muted); }
+      .lane .lk.lost { border-top-style: dashed; border-top-color: var(--rcs-error); }
+      .lane.single .lk { flex: 0 0 14px; }
+      .lane.single::after { content: ''; flex: 1; }
+      .lane .ts { display: flex; gap: 2px; flex: none; align-items: center; }
+      .lane .ts i { width: 11px; height: 12px; border-radius: 2px; background: color-mix(in srgb, var(--rcs-muted) 30%, transparent); border: 1px solid color-mix(in srgb, var(--rcs-muted) 50%, transparent); box-sizing: border-box; }
+      .lane .ts i.ok { background: color-mix(in srgb, var(--rcs-ok) 25%, transparent); border-color: color-mix(in srgb, var(--rcs-ok) 60%, transparent); }
+      .lane .ts i.warning { background: color-mix(in srgb, var(--rcs-warn) 40%, transparent); border-color: var(--rcs-warn); }
+      .lane .ts i.critical { background: color-mix(in srgb, var(--rcs-error) 40%, transparent); border-color: var(--rcs-error); }
+      .lane .more { font: 11px var(--rcs-mono); color: var(--rcs-muted); margin-left: 3px; }
+      .lane.warning { background: color-mix(in srgb, var(--rcs-warn) 10%, transparent); }
+      .side { overflow-y: auto; }
+      .kv { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; font-size: 14px; margin: 0; }
+      .kv dt { color: var(--rcs-muted); white-space: nowrap; }
+      .kv dd { margin: 0; font-family: var(--rcs-mono); overflow-wrap: anywhere; }
+      .kv dd.bad { color: var(--rcs-error); }
+      .side h3 { margin: 0; font-size: 18px; }
+      .side .note { white-space: normal; }
+      .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--rcs-muted); margin-top: auto; }
+      .legend span { display: inline-flex; align-items: center; gap: 6px; }
+      .legend .k { width: 22px; border-top: 3px solid var(--rcs-ok); }
+      .legend .k.standby { border-top-style: dashed; border-top-color: var(--rcs-muted); } .legend .k.lost { border-top-style: dashed; border-top-color: var(--rcs-error); }
+
       /* setup */
       .setup { flex: 1; min-height: 0; display: grid; grid-template-columns: 400px 1fr 660px; gap: 22px; }
       .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -122,6 +183,11 @@
         <div class="box"><span class="label" id="sideHead">TILES</span><div id="loopSide" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto"></div></div>
       </section>
 
+      <section id="view-topology" class="topo-view" hidden>
+        <div class="wall" id="wall"></div>
+        <div class="box side" id="topoSide"></div>
+      </section>
+
       <section id="view-setup" class="setup" hidden>
         <div class="col">
           <span class="label">ADD A PROCESSOR</span>
@@ -144,7 +210,7 @@
         <div class="col">
           <span class="label">ALERT LIMITS</span>
           <div class="limits" id="limits"></div>
-          <p class="note" style="white-space: normal">Named saves hold the processor list, these limits and Allow controls. Restoring one never sends anything to a processor.</p>
+          <p class="note" style="white-space: normal">Named saves hold the processor list, these limits, the wall layouts and Allow controls. Restoring one never sends anything to a processor.</p>
         </div>
       </section>
     </main>
@@ -161,7 +227,7 @@
 
     <script type="module">
       const $ = (id) => document.getElementById(id);
-      const TITLES = { overview: 'LED processors', alerts: 'Alerts', loops: 'Loops and tiles', setup: 'Setup' };
+      const TITLES = { overview: 'LED processors', alerts: 'Alerts', loops: 'Loops and tiles', topology: 'Topology', setup: 'Setup' };
       const SEV = { ok: 'OK', warning: 'Warning', critical: 'Critical', unknown: 'Unknown' };
       const KIND = { brompton: 'Brompton', coex: 'NovaStar COEX', vxpro: 'NovaStar VX Pro', device: 'Device' };
       const LIMITS = [
@@ -171,6 +237,8 @@
       ];
       let s = null;
       let onYes = null;
+      let wallId = ''; // the wall this screen shows
+      let pick = null; // what is tapped on the wall: { kind: 'processor', id } | { kind: 'box', group, side } | { kind: 'chain', id }
 
       function el(tag, attrs = {}, text) {
         const e = document.createElement(tag);
@@ -209,9 +277,9 @@
         $('overallText').textContent = s.processors.length ? (s.severity === 'ok' ? 'All OK' : `${SEV[s.severity]}${s.alerts.length ? ` · ${s.alerts.length} alert${s.alerts.length > 1 ? 's' : ''}` : ''}`) : 'No processors';
         $('sub').textContent = `Polling every ${s.pollSeconds} s · ${s.allowControls ? 'commands need a second key press' : 'read only'}`;
         $('empty').hidden = !none;
-        for (const x of ['overview', 'alerts', 'loops', 'setup']) $('view-' + x).hidden = none || v !== x;
+        for (const x of ['overview', 'alerts', 'loops', 'topology', 'setup']) $('view-' + x).hidden = none || v !== x;
         drawTabs();
-        if (!none) ({ overview: drawOverview, alerts: drawAlerts, loops: drawLoops, setup: drawSetup })[v]();
+        if (!none) ({ overview: drawOverview, alerts: drawAlerts, loops: drawLoops, topology: drawTopology, setup: drawSetup })[v]();
         const t = $('toast');
         t.hidden = !s.armed?.what;
         if (s.armed?.what) t.textContent = `Press the key again to send: ${s.armed.what}`;
@@ -220,6 +288,17 @@
       function drawTabs() {
         const box = $('procTabs');
         box.replaceChildren();
+        if (s.view === 'topology') {
+          // On the Topology view the tabs choose the wall, on this screen only.
+          box.hidden = s.walls.length < 2;
+          for (const w of s.walls) {
+            const b = el('button', { 'aria-pressed': w.id === wall()?.id, class: w.severity });
+            b.append(el('span', { class: 'dot' }), w.name);
+            b.onclick = () => { wallId = w.id; pick = null; draw(); };
+            box.append(b);
+          }
+          return;
+        }
         box.hidden = s.view === 'setup' || s.view === 'alerts' || s.processors.length < 2;
         for (const p of s.processors) {
           const b = el('button', { 'aria-pressed': p.id === s.current, class: p.severity });
@@ -370,6 +449,204 @@
         }
         if (o.topology?.notes?.length) for (const n of o.topology.notes) side.append(el('p', { class: 'note', style: 'white-space: normal' }, n));
         if (!o.tiles && !o.tileTemperatures.length) side.append(el('p', { class: 'note' }, 'No tile counts reported.'));
+      }
+
+      // ---- topology ----
+      const wall = () => s.walls.find((w) => w.id === wallId) ?? s.walls[0];
+      const LINK = { ok: 'driving', standby: 'standby', lost: 'lost', unknown: 'not known' };
+      const PORT = { ok: 'Driving', standby: 'Ready', lost: 'Lost', unknown: '–' };
+      const MAX_TILES = 14;
+      const plural = (n, w) => `${n} ${w}${n === 1 ? '' : w.endsWith('x') ? 'es' : 's'}`;
+
+      function wallSummary(w) {
+        const chains = w.groups.reduce((n, g) => n + g.chains.length, 0);
+        const tiles = w.groups.reduce((n, g) => n + g.chains.reduce((m, c) => m + c.tileCount, 0), 0);
+        const boxes = w.groups.reduce((n, g) => n + (g.right ? 2 : 1), 0);
+        return [w.backup ? 'Redundant pair' : 'Single processor', w.source === 'processor' ? plural(boxes, 'output group') : plural(boxes, 'distribution box'), plural(chains, 'chain'), w.source === 'loops' ? 'from cable loops' : plural(tiles, 'tile')].join(' · ');
+      }
+
+      function drawTopology() {
+        const host = $('wall');
+        host.replaceChildren();
+        const w = wall();
+        if (!w) {
+          host.append(el('p', { class: 'note', style: 'white-space: normal; font-size: 16px' }, 'No walls to draw yet. Brompton walls are drawn from each processor\'s cable loops, and COEX walls from the processor\'s own cabinet map. A VX Pro reports neither.'));
+          drawTopoSide(null);
+          return;
+        }
+        const head = el('div', { class: 'wall-head' });
+        const pill = el('span', { class: 'pill ' + w.severity });
+        pill.append(el('span', { class: 'dot' }), SEV[w.severity]);
+        head.append(el('span', { class: 'n' }, w.name), pill, el('span', { class: 'note' }, wallSummary(w)));
+        host.append(head);
+
+        // One grid column per box and one per chain area, with a narrow gap between groups.
+        const cols = [];
+        const at = [];
+        w.groups.forEach((g, i) => {
+          if (i > 0) cols.push('20px');
+          const left = cols.push(g.right ? '112px' : '190px');
+          const lanes = cols.push('minmax(180px, 1fr)');
+          const right = g.right ? cols.push('112px') : undefined;
+          at.push({ left, lanes, right });
+        });
+        const grid = el('div', { class: 'topo' + (w.backup ? '' : ' single'), style: `grid-template-columns: ${cols.join(' ')}` });
+        const trunkCol = (t) => (t.side === 'left' ? at[t.group].left : at[t.group].right ?? at[t.group].left);
+        const trunk = (state, col, row, label) => {
+          const d = el('div', { class: 'trunk ' + state, style: `grid-column: ${col}; grid-row: ${row}`, title: `${label} · ${LINK[state]}` });
+          d.append(el('div', { class: 'ln' }));
+          return d;
+        };
+        grid.append(procBar(w.primary, 1));
+        for (const t of w.trunks) grid.append(trunk(t.fromPrimary, trunkCol(t), 2, t.label));
+        w.groups.forEach((g, gi) => {
+          grid.append(xdBox(g, gi, 'left', at[gi].left));
+          const lanes = el('div', { class: 'lanes', style: `grid-column: ${at[gi].lanes}; grid-row: 3` });
+          lanes.append(el('div', { class: 'lh' }, g.right ? 'TILE CHAINS · LOOPED' : 'TILE CHAINS'));
+          for (const c of g.chains) lanes.append(lane(c));
+          grid.append(lanes);
+          if (g.right) grid.append(xdBox(g, gi, 'right', at[gi].right));
+        });
+        if (w.backup) {
+          for (const t of w.trunks) grid.append(trunk(t.fromBackup ?? 'unknown', trunkCol(t), 4, t.label));
+          grid.append(procBar(w.backup, 5));
+        }
+        const sc = el('div', { class: 'topo-scroll' });
+        sc.append(grid);
+        host.append(sc);
+        drawTopoSide(w);
+      }
+
+      function procBar(p, row) {
+        const b = el('button', { class: 'pbar ' + p.severity + (pick?.kind === 'processor' && pick.id === p.id ? ' sel' : ''), style: `grid-row: ${row}` });
+        const state = !p.reachable ? 'Offline' : p.driving ? 'Driving the wall' : p.role === 'backup' ? 'Standby' : 'Not driving';
+        const sev = !p.reachable ? 'critical' : p.driving ? (p.role === 'backup' ? 'warning' : 'ok') : 'unknown';
+        const pill = el('span', { class: 'pill ' + sev });
+        pill.append(state);
+        b.append(el('span', { class: 'dot' }), el('span', { class: 'pn' }, p.name));
+        if (p.role !== 'single') b.append(el('span', { class: 'tag' }, p.role === 'primary' ? 'PRIMARY' : 'BACKUP'));
+        b.append(pill, el('span', { class: 'pm' }, p.summary));
+        b.onclick = () => { pick = { kind: 'processor', id: p.id }; draw(); };
+        return b;
+      }
+
+      function xdBox(g, gi, side, col) {
+        const box = g[side];
+        const d = el('div', { class: 'xd' + (box.online === false ? ' off' : ''), style: `grid-column: ${col}; grid-row: 3` });
+        const selected = pick?.kind === 'box' && pick.group === gi && pick.side === side;
+        const h = el('button', { class: 'xd-head' + (selected ? ' sel' : '') }, box.name);
+        h.onclick = () => { pick = { kind: 'box', group: gi, side }; draw(); };
+        d.append(h);
+        for (const c of g.chains) {
+          const p = side === 'left' ? c.from : c.to ?? { label: '', state: 'unknown' };
+          const lsev = p.load ? (p.load.percent > 100 ? 'critical' : p.load.percent >= s.thresholds.portLoadWarnPercent ? 'warning' : 'ok') : '';
+          const r = el('div', { class: `port ${p.state}${lsev && lsev !== 'ok' ? ' load-' + lsev : ''}` });
+          r.append(el('span', { class: 'pl' }, p.label));
+          if (p.load) {
+            const bar = el('span', { class: 'bar ' + lsev });
+            bar.append(el('b', { style: `width: ${Math.min(100, p.load.percent)}%` }));
+            r.append(bar, el('span', { class: 'pct' }, `${Math.round(p.load.percent)}%`));
+          } else r.append(el('span', { class: 'dot' }), PORT[p.state]);
+          d.append(r);
+        }
+        return d;
+      }
+
+      function lane(c) {
+        const end = c.loop === 'broken' ? 'lost' : c.loop === 'none' ? 'none' : 'standby';
+        const b = el('button', { class: `lane ${c.severity === 'warning' || c.severity === 'critical' ? c.severity : ''}${end === 'none' ? ' single' : ''}${pick?.kind === 'chain' && pick.id === c.id ? ' sel' : ''}`, 'aria-label': `Chain ${c.label}, ${c.tileCount} tiles` });
+        b.append(el('span', { class: 'lk ' + c.from.state }));
+        const ts = el('span', { class: 'ts' });
+        for (const t of c.tiles.slice(0, MAX_TILES)) ts.append(el('i', { class: t.severity }));
+        if (c.tileCount > MAX_TILES) ts.append(el('span', { class: 'more' }, `+${c.tileCount - MAX_TILES}`));
+        b.append(ts);
+        if (end !== 'none') b.append(el('span', { class: 'lk ' + end }));
+        b.onclick = () => { pick = { kind: 'chain', id: c.id }; draw(); };
+        return b;
+      }
+
+      function kv(rows) {
+        const dl = el('dl', { class: 'kv' });
+        for (const [k, v, bad] of rows) dl.append(el('dt', {}, k), el('dd', { class: bad ? 'bad' : '' }, v ?? '–'));
+        return dl;
+      }
+
+      function drawTopoSide(w) {
+        const side = $('topoSide');
+        side.replaceChildren();
+        side.append(el('span', { class: 'label' }, pick ? 'SELECTED' : 'WALL'));
+        const body = w && pickDetail(w);
+        if (body) side.append(...body);
+        else if (w) {
+          side.append(el('h3', {}, w.name), el('p', { class: 'note' }, wallSummary(w)));
+          for (const n of w.notes) side.append(el('p', { class: 'note' }, n));
+          side.append(el('p', { class: 'note' }, 'Tap a processor, box or chain for its details.'));
+        }
+        const lg = el('div', { class: 'legend' });
+        for (const [cls, text] of [['ok', 'Driving'], ['standby', 'Standby or loop end'], ['lost', 'Lost']]) {
+          const sp = el('span');
+          sp.append(el('span', { class: 'k ' + cls }), text);
+          lg.append(sp);
+        }
+        side.append(lg);
+      }
+
+      function pickDetail(w) {
+        if (!pick) return null;
+        if (pick.kind === 'processor') {
+          const p = s.processors.find((x) => x.id === pick.id);
+          const wp = [w.primary, w.backup].find((x) => x?.id === pick.id);
+          if (!p || !wp) return null;
+          const out = [el('h3', {}, p.name), el('p', { class: 'note' }, `${p.model || KIND[p.kind]} · ${p.host}`)];
+          out.push(kv([
+            ['State', p.reachable ? SEV[p.severity] : 'Offline', p.severity === 'critical' || p.severity === 'warning'],
+            ['Wall', !wp.reachable ? 'Offline' : wp.driving ? 'Driving' : 'Not driving'],
+            ['Redundancy', p.redundancy],
+            ['Input', p.input, !p.inputOk],
+            ['Hottest sensor', p.hottest ? `${p.hottest.label} ${p.hottest.value.toFixed(1)} °C` : ''],
+            ['Fans', p.fans, !p.fansOk],
+            ['Tiles', p.tiles ? `${fmt(p.tiles.online)} of ${fmt(p.tiles.associated)} online` : '', p.tiles && p.tiles.online < p.tiles.associated],
+            ['Firmware', p.firmware]
+          ]));
+          for (const a of p.alerts.slice(0, 3)) {
+            const line = el('div', { class: 'alerts' });
+            const sp = el('span', { class: a.severity });
+            sp.append(el('span', { class: 'dot' }), a.message);
+            line.append(sp);
+            out.push(line);
+          }
+          return out;
+        }
+        if (pick.kind === 'box') {
+          const g = w.groups[pick.group];
+          const box = g?.[pick.side];
+          if (!box) return null;
+          const ports = g.chains.map((c) => (pick.side === 'left' ? c.from : c.to)).filter(Boolean);
+          const lost = ports.filter((p) => p.state === 'lost').map((p) => p.label);
+          return [el('h3', {}, box.name), el('p', { class: 'note' }, w.name), kv([
+            ['Fed by', box.trunk ? `Trunk ${box.trunk}` : ''],
+            ['Seen by the processor', box.online === undefined ? 'Not checked (no serial)' : box.online ? 'Yes' : 'No', box.online === false],
+            ['Firmware', box.firmware],
+            ['Ports in use', String(ports.length)],
+            ['Ports lost', lost.join(', ') || 'None', lost.length > 0]
+          ])];
+        }
+        for (const g of w.groups) {
+          const c = g.chains.find((x) => x.id === pick.id);
+          if (!c) continue;
+          const loop = { ok: 'Confirmed by the processor', broken: 'Broken: redundant end lost', unknown: 'Not reported', none: 'Single-ended chain' }[c.loop];
+          const bad = c.tiles.filter((t) => t.severity === 'warning' || t.severity === 'critical');
+          const rows = [['Driven from', `${g.left.name} port ${c.from.label}`]];
+          if (c.to && g.right) rows.push(['Redundant end', `${g.right.name} port ${c.to.label} · ${PORT[c.to.state].toLowerCase()}`, c.to.state === 'lost']);
+          rows.push(['Cable loop', loop, c.loop === 'broken']);
+          if (c.from.load) rows.push(['Port load', `${Math.round(c.from.load.percent)}% · ${fmt(c.from.load.pixels)} of ${fmt(c.from.load.capacity)} px`, c.from.load.percent >= s.thresholds.portLoadWarnPercent]);
+          rows.push(['Tiles', bad.length ? `${bad.length} with problems` : c.tiles.some((t) => t.severity === 'ok') ? 'All OK' : w.source === 'loops' ? 'Not set: add this wall in Setup' : 'Count only', bad.length > 0]);
+          const out = [el('h3', {}, `Chain ${c.label}`), el('p', { class: 'note' }, `${w.name} · ${w.source === 'loops' ? 'tile count not set' : plural(c.tileCount, 'tile')}`), kv(rows)];
+          for (const t of bad.slice(0, 6)) out.push(el('p', { class: 'note ' + t.severity, style: 'color: var(--sev)' }, `${t.label ?? t.id}${t.detail ? ' · ' + t.detail : ''}`));
+          for (const n of c.notes) out.push(el('p', { class: 'note' }, n));
+          return out;
+        }
+        return null;
       }
 
       function drawSetup() {

@@ -50,13 +50,13 @@ export interface PortCapacity {
  * reports, scaled by its output frame rate (120 Hz halves it). A capacity set in the settings wins.
  */
 export function portCapacity(hw: unknown, output: unknown, configured?: number): PortCapacity {
-  if (configured) return { pixels: configured, basis: `Port capacity ${configured.toLocaleString('en-US')} pixels, as set in Settings.` };
+  if (configured) return { pixels: configured, basis: `Port capacity ${configured.toLocaleString('en-US')} pixels, as set in Setup.` };
   const gbps = PORT_GBPS[num(obj(hw).netPortBandWidth) ?? -1];
   const out = obj(Array.isArray(output) ? output[0] : output);
   const reported = num(out.currentFrameRate);
   const rate = reported && reported > 0 ? reported : 60;
   if (!gbps) {
-    return { pixels: Math.round((DEFAULT_PORT_CAPACITY * 60) / rate), basis: `Port capacity assumes 1G ports at ${rate} Hz; set it in Settings if the ports are faster.` };
+    return { pixels: Math.round((DEFAULT_PORT_CAPACITY * 60) / rate), basis: `Port capacity assumes 1G ports at ${rate} Hz; set it in Setup if the ports are faster.` };
   }
   const pixels = Math.round((DEFAULT_PORT_CAPACITY * gbps * 60) / rate);
   return { pixels, basis: `Port capacity ${pixels.toLocaleString('en-US')} pixels: ${gbps}G ports at ${rate} Hz, 8 bit.` };

@@ -1,11 +1,11 @@
 // LED Processor Monitor: watches Brompton Tessera and NovaStar (COEX, VX Pro) LED processors on the show
 // network, ported from LEDScreenControl. Health rules turn each reading into alerts; the panel shows
-// every processor, its alerts, its cable loops, tiles and output ports, and the Stream Deck holds the
-// controls for the selected processor.
+// every processor, its alerts, its cable loops, tiles and output ports, a topology diagram of each wall,
+// and the Stream Deck holds the controls for the selected processor.
 //
 // The processors are the source of truth. Everything read from them is kept only in memory: state holds
-// which processor the panel shows, config holds the processor list, the alert limits and the Allow
-// controls switch. Starting, restoring a save, resuming after a power cut and reconnecting only read.
+// which processor the panel shows, config holds the processor list, the alert limits, the Brompton wall
+// layouts and the Allow controls switch. Starting, restoring a save, resuming after a power cut and reconnecting only read.
 // A command (preset, brightness, freeze, blackout, input, failover, reboot) goes out only when the
 // operator asks, only with Allow controls on, and only after a confirmation: a second press of the same
 // key within 3 seconds on the Stream Deck, a dialog in the web view.
@@ -25,8 +25,10 @@ import { randomBytes } from 'node:crypto';
 import { defineModule, type Ctx, type KeySetParams } from '@rcs/module-sdk';
 import { ControlError, Monitor, describe, type MonitorEvent } from './monitor.js';
 import { identify, isSubnet, localSubnets } from './scan.js';
-import { type ControlRequest, type ProcessorConfig, type ProcessorKind, type ProcessorView, type Severity, tileTemperatureSummary, worstSeverity } from './shared.js';
+import { type ControlRequest, type ProcessorConfig, type ProcessorKind, type ProcessorView, type Severity, type WallLayout, type WallView, tileTemperatureSummary, wallGroupsFromLoops, worstSeverity } from './shared.js';
 import { cleanThresholds, DEFAULT_THRESHOLDS, THRESHOLD_RANGES, type Thresholds } from './thresholds.js';
+import { Topology } from './topology.js';
+import { cleanWalls, parseWalls, WallError } from './walls.js';
 
 export interface State {
   /** Id of the processor the panel and keys work on. */
@@ -48,13 +50,15 @@ export interface ProcessorEntry {
 export interface Config {
   processors: ProcessorEntry[];
   thresholds: Thresholds;
+  /** How each Brompton wall is cabled. COEX walls come from the processor and need nothing here. */
+  walls: WallLayout[];
   /** Lets the operator send commands. Off: the module only reads. */
   allowControls: boolean;
 }
 
 type C = Ctx<State, Config>;
-export type View = 'overview' | 'alerts' | 'loops' | 'setup';
-const VIEWS: View[] = ['overview', 'alerts', 'loops', 'setup'];
+export type View = 'overview' | 'alerts' | 'loops' | 'topology' | 'setup';
+const VIEWS: View[] = ['overview', 'alerts', 'loops', 'topology', 'setup'];
 const KINDS: ProcessorKind[] = ['brompton', 'coex', 'vxpro', 'device'];
 
 export const KEY = { PROC: [0, 1, 2, 3], ALERTS: 4, PRESET: [5, 6, 7], DIM: 8, BRIGHT: 9, FREEZE: 10, PRESET_PAGE: 12, BLACKOUT: 14 } as const;
@@ -93,6 +97,9 @@ interface Found {
 
 interface Runtime {
   monitor: Monitor;
+  topology: Topology;
+  /** Built after every poll, so a broken loop is pinned to its chain whichever view is showing. */
+  walls: WallView[];
   view: View;
   procPage: number;
   presetPage: number;
@@ -115,9 +122,11 @@ function cleanEntry(p: any): ProcessorEntry | null {
 
 export function cfg(ctx: C): Config {
   const c = (ctx.config ?? {}) as Partial<Config>;
+  const processors = Array.isArray(c.processors) ? c.processors.map(cleanEntry).filter((p): p is ProcessorEntry => !!p) : [];
   return {
-    processors: Array.isArray(c.processors) ? c.processors.map(cleanEntry).filter((p): p is ProcessorEntry => !!p) : [],
+    processors,
     thresholds: cleanThresholds(c.thresholds),
+    walls: cleanWalls(c.walls, new Set(processors.map((p) => p.id))),
     allowControls: c.allowControls ?? false
   };
 }
@@ -214,6 +223,12 @@ function outputs(p: ProcessorView | undefined) {
   return { id: p.id, name: p.name, kind: p.kind, loops: p.loops, tiles: p.tiles ?? null, topology: p.topology ?? null, devices: p.devices ?? [], tileTemperatures: p.tileTemperatures ?? [] };
 }
 
+/** Paints the processors' latest readings onto the wall layouts, and adds each COEX processor's own wall. */
+function refreshWalls(ctx: C): void {
+  if (!rt) return;
+  rt.walls = rt.topology.build(cfg(ctx).walls, new Map(views().map((p) => [p.id, p])));
+}
+
 function activeAlerts() {
   return views()
     .flatMap((p) => p.alerts.map((a) => ({ ...a, proc: p.id, procName: p.name })))
@@ -235,6 +250,8 @@ export function snapshot(ctx: C) {
     entries: c.processors,
     current: cur?.id ?? '',
     outputs: rt?.view === 'loops' ? outputs(cur) : null,
+    walls: rt?.walls ?? [],
+    layouts: c.walls,
     alerts: activeAlerts(),
     events: rt?.monitor.recentEvents(60) ?? [],
     armed: rt?.armed ? { key: rt.armed.key, proc: rt.armed.proc, what: cur && rt.armed.proc === cur.id ? describe(rt.armed.req, cur) : '' } : null,
@@ -408,6 +425,7 @@ function syncMonitor(ctx: C): void {
   const c = cfg(ctx);
   rt.monitor.thresholds = c.thresholds;
   rt.monitor.setProcessors(c.processors.map(toDriverConfig));
+  refreshWalls(ctx);
   quiet(reportStatus(ctx));
 }
 
@@ -450,7 +468,9 @@ async function removeProcessor(ctx: C, id: unknown): Promise<void> {
   const c = cfg(ctx);
   const e = c.processors.find((p) => p.id === id);
   if (!rt || !e) return;
-  await ctx.setConfig({ ...c, processors: c.processors.filter((p) => p.id !== e.id) });
+  const processors = c.processors.filter((p) => p.id !== e.id);
+  // A wall driven by the removed processor goes with it; one that used it as the backup keeps its primary.
+  await ctx.setConfig({ ...c, processors, walls: cleanWalls(c.walls, new Set(processors.map((p) => p.id))) });
   if (rt.armed?.proc === e.id) disarm();
   await ctx.log('info', `Removed processor ${e.host}`);
   syncMonitor(ctx);
@@ -484,6 +504,40 @@ async function setThresholds(ctx: C, t: unknown): Promise<void> {
   syncMonitor(ctx);
   await ctx.notify('Alert limits saved. They apply from the next poll.');
   await draw(ctx);
+}
+
+async function setWalls(ctx: C, raw: unknown, clientId: string): Promise<void> {
+  const c = cfg(ctx);
+  let walls: WallLayout[];
+  try {
+    walls = parseWalls(raw, new Set(c.processors.filter((p) => p.kind === 'brompton').map((p) => p.id)));
+  } catch (e) {
+    if (!(e instanceof WallError)) throw e;
+    // The editor keeps its changes so they can be corrected.
+    await ctx.ui.send({ type: 'walls-result', ok: false }, clientId);
+    return ctx.notify(`Walls not saved: ${e.message}`, 'warning');
+  }
+  await ctx.setConfig({ ...c, walls });
+  await ctx.log('info', `Wall layouts saved (${walls.length})`);
+  await ctx.notify('Wall layouts saved');
+  refreshWalls(ctx);
+  await draw(ctx);
+  await ctx.ui.send({ type: 'walls-result', ok: true }, clientId);
+}
+
+/**
+ * The XD pairs and chains a Brompton processor's cable loop reports show, for the wall editor to start from, and its
+ * failover partner as the backup. Built from the last reading: nothing is asked of the processor.
+ */
+function suggestWall(m: any) {
+  const p = typeof m.primary === 'string' ? rt?.monitor.view(m.primary) : undefined;
+  if (!p || p.kind !== 'brompton') return { type: 'wall-suggestion', ref: m.ref, error: 'Choose a Brompton processor first' };
+  if (!p.loops.length) return { type: 'wall-suggestion', ref: m.ref, error: `${p.name} reports no cable loops` };
+  const existing = Array.isArray(m.groups) ? (m.groups as WallLayout['groups']) : [];
+  const groups = wallGroupsFromLoops(p.loops, existing, p.tiles?.associated ?? 0);
+  const serial = p.failover?.partnerSerial;
+  const partner = serial ? views().find((x) => x.id !== p.id && x.serial === serial) : undefined;
+  return { type: 'wall-suggestion', ref: m.ref, groups, backup: partner?.id ?? '' };
 }
 
 async function setAllow(ctx: C, on: unknown): Promise<void> {
@@ -631,20 +685,26 @@ export default defineModule<State, Config>({
     if (rt) rt.monitor.stop();
     const c = cfg(ctx);
     const monitor = new Monitor({ pollIntervalMs: pollMs(), requestTimeoutMs: timeoutMs(), thresholds: c.thresholds ?? DEFAULT_THRESHOLDS, dataDir: ctx.dataDir });
-    const r: Runtime = (rt = { monitor, view: 'overview', procPage: 0, presetPage: 0, armed: null, scanning: false, found: [], drawTimer: null });
+    const r: Runtime = (rt = { monitor, topology: new Topology(), walls: [], view: 'overview', procPage: 0, presetPage: 0, armed: null, scanning: false, found: [], drawTimer: null });
     await ctx.state.init({ proc: '' });
     await ctx.strip.set([
       { id: 'overview', label: 'Overview', icon: 'assets/overview.svg' },
       { id: 'alerts', label: 'Alerts', icon: 'assets/alerts.svg' },
       { id: 'loops', label: 'Loops', icon: 'assets/loops.svg' },
+      { id: 'topology', label: 'Topology', icon: 'assets/topology.svg' },
       { id: 'setup', label: 'Setup', icon: 'assets/setup.svg' }
     ]);
-    monitor.on('change', () => rt === r && soon(ctx));
+    monitor.on('change', () => {
+      if (rt !== r) return;
+      refreshWalls(ctx);
+      soon(ctx);
+    });
     monitor.on('event', (e: MonitorEvent) => {
       if (rt !== r || e.source === 'control') return;
       if (e.level === 'warning' || e.level === 'critical') quiet(ctx.log(e.level === 'critical' ? 'error' : 'warning', e.message));
     });
     monitor.setProcessors(c.processors.map(toDriverConfig));
+    refreshWalls(ctx);
     monitor.start(); // reads only: nothing is sent on start, whatever the reason
     if (!ctx.state.value.proc && c.processors[0]) await ctx.state.patch({ proc: c.processors[0].id });
     await reportStatus(ctx);
@@ -726,6 +786,10 @@ export default defineModule<State, Config>({
         return setThresholds(ctx, m.values);
       case 'allow':
         return setAllow(ctx, m.on);
+      case 'walls':
+        return setWalls(ctx, m.walls, clientId);
+      case 'suggest-wall':
+        return ctx.ui.send(suggestWall(m), clientId);
       case 'scan':
         return scan(ctx, m.subnet);
       case 'reconnect':

@@ -278,6 +278,8 @@ export interface DashboardState {
 export interface WallLayout {
   id: string;
   name: string;
+  /** Built from the processor's cable loop reports, not from config: chains have no tile counts. */
+  fromLoops?: boolean;
   /** Processor id of the processor that normally drives the wall. */
   primary: string;
   /** Processor id of its redundant partner, if there is one. */
@@ -370,7 +372,8 @@ export interface TrunkView {
 export interface WallView {
   id: string;
   name: string;
-  source: 'layout' | 'processor';
+  /** layout: a Brompton layout from config. loops: a Brompton wall drawn from its cable loop reports alone. processor: COEX's own map. */
+  source: 'layout' | 'loops' | 'processor';
   severity: Severity;
   primary: WallProcessorView;
   backup?: WallProcessorView;
