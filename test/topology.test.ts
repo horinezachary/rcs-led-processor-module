@@ -46,7 +46,9 @@ async function pair() {
   const pollBoth = async () => {
     await monitor.pollOnce(MAIN);
     await monitor.pollOnce(BACKUP);
-    return topology.build([layout], new Map(monitor.views().map((v) => [v.id, v])))[0]!;
+    const walls = topology.build([layout], new Map(monitor.views().map((v) => [v.id, v])));
+    expect(walls).toHaveLength(1); // the pair is in the layout, so no wall from its loops as well
+    return walls[0]!;
   };
   const set = (s: Scenario) => {
     main.scenario = s;
@@ -124,6 +126,45 @@ describe('topology', () => {
     expect(wall.trunks[0]).toMatchObject({ fromPrimary: 'lost', fromBackup: 'ok' });
   });
 
+  it('draws a Brompton pair from its cable loops alone when there is no layout, and keeps a broken loop on its chain', async () => {
+    const { main, backup, ports } = await sims();
+    const monitor = monitorFor(
+      [
+        // The backup first in the list: the wall still puts the primary on top.
+        { id: BACKUP, kind: 'brompton', host: '127.0.0.1', port: ports[1] },
+        { id: MAIN, kind: 'brompton', host: '127.0.0.1', port: ports[0] },
+      ],
+      { requestTimeoutMs: 500 },
+    );
+    const topology = new Topology();
+    const poll = async () => {
+      await monitor.pollOnce(MAIN);
+      await monitor.pollOnce(BACKUP);
+      const walls = topology.build([], new Map(monitor.views().map((v) => [v.id, v])));
+      expect(walls).toHaveLength(1);
+      return walls[0]!;
+    };
+    let wall = await poll();
+    expect(wall).toMatchObject({ source: 'loops', name: 'Main', primary: { id: MAIN, driving: true }, backup: { id: BACKUP, driving: false } });
+    const chains = wall.groups.flatMap((g) => g.chains);
+    expect(chains).toHaveLength(20);
+    expect(chains[3]).toMatchObject({ label: 'A4 to B4', loop: 'ok', tileCount: 0, tiles: [] });
+    expect(wall.notes.join(' ')).toMatch(/Add this wall in Setup/);
+    expect(wall.notes.join(' ')).not.toMatch(/layout has/);
+
+    main.scenario = backup.scenario = 'loop-broken';
+    wall = await poll();
+    expect(wall.groups.flatMap((g) => g.chains)).toHaveLength(20);
+    expect(wall.groups[0]!.chains[3]).toMatchObject({ loop: 'broken', to: { label: 'B4', state: 'lost' } });
+    expect(wall.severity).toBe('warning');
+  });
+
+  it('uses the layout instead once the wall is described, and leaves its processors out of the loop walls', async () => {
+    const { pollBoth } = await pair();
+    const wall = await pollBoth();
+    expect(wall.source).toBe('layout');
+  });
+
   it('says when tiles are offline but cannot place them', async () => {
     const { pollBoth, set } = await pair();
     set('tiles-offline');
@@ -158,7 +199,7 @@ async function startModule(walls: unknown[] = []) {
     allowControls: true,
   } as Config;
   sim = await startTestModule(mod, { config, reason: 'boot' });
-  await until(() => last()?.processors?.every((p: any) => p.reachable) && last().walls.length === walls.length + 1, 'for the walls');
+  await until(() => last()?.processors?.every((p: any) => p.reachable) && last().walls.length === 2, 'for the walls');
   return { main, backup, coex: c };
 }
 
@@ -186,6 +227,7 @@ describe('the Topology view', () => {
     expect(sim!.notifications.at(-1)?.text).toMatch(/Walls not saved: .*primary/);
     expect(sim!.config.walls).toEqual([]);
 
+    expect(last().walls.map((w: any) => w.source)).toEqual(['loops', 'processor']);
     await sim!.sendUi({ type: 'walls', walls: [wall] });
     await sim!.settle();
     expect(sim!.config.walls).toEqual([{ id: 'upstage', name: 'Upstage', primary: MAIN, backup: BACKUP, groups: [{ left: { name: 'XD A', trunk: 'A', ports: 10 }, right: { name: 'XD B', trunk: 'B', ports: 10 }, chains: [8, 8] }] }]);

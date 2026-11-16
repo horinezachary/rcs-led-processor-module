@@ -4,6 +4,7 @@
 // Live state is painted onto that layout: which processor is driving, trunk state, and which chain loops are intact.
 import type {
   BoxLayout,
+  GroupLayout,
   BoxView,
   ChainView,
   GroupView,
@@ -17,25 +18,56 @@ import type {
   WallProcessorView,
   WallView,
 } from './shared.js';
-import { worstSeverity } from './shared.js';
+import { wallGroupsFromLoops, worstSeverity } from './shared.js';
 
 const LOOP_FOUND = /^loop-found:\s*([A-Za-z]+\d+)\s*->\s*([A-Za-z]+\d+)/;
 
 export class Topology {
   /** Which loop index each chain was last seen under, per processor, so a lost loop can be pinned to its chain. */
   private loopOf = new Map<string, string>();
+  /** The XD pairs and ports last seen in each Brompton processor's loop reports, so a lost loop keeps its chain. */
+  private seenGroups = new Map<string, GroupLayout[]>();
 
   build(layouts: WallLayout[], processors: Map<string, ProcessorView>): WallView[] {
     const walls: WallView[] = [];
+    const covered = new Set<string>();
     for (const layout of layouts) {
       const primary = processors.get(layout.primary);
       if (!primary) continue;
+      covered.add(layout.primary);
+      if (layout.backup) covered.add(layout.backup);
       walls.push(this.layoutWall(layout, primary, layout.backup ? processors.get(layout.backup) : undefined));
+    }
+    // Every other Brompton processor still gets a wall, drawn from its cable loops, with its failover partner.
+    for (const p of processors.values()) {
+      if (p.kind !== 'brompton' || covered.has(p.id)) continue;
+      const serial = p.failover?.partnerSerial;
+      const partner = serial ? [...processors.values()].find((x) => x.kind === 'brompton' && x.id !== p.id && !covered.has(x.id) && x.serial === serial) : undefined;
+      const [primary, backup] = partner && p.failover?.role === 'backup' && partner.failover?.role !== 'backup' ? [partner, p] : [p, partner];
+      covered.add(primary.id);
+      if (backup) covered.add(backup.id);
+      walls.push(this.loopsWall(primary, backup));
     }
     for (const p of processors.values()) {
       if (p.topology) walls.push(processorWall(p));
     }
     return walls;
+  }
+
+  private loopsWall(primary: ProcessorView, backup: ProcessorView | undefined): WallView {
+    const source = primary.loops.length ? primary : backup?.loops.length ? backup : primary;
+    const derived = wallGroupsFromLoops(source.loops, [], 0);
+    const chains = (g: GroupLayout[]) => g.reduce((n, x) => n + x.chains.filter((c) => c > 0).length, 0);
+    const key = primary.id;
+    const before = this.seenGroups.get(key);
+    // A broken loop can drop out of the report's pairing: keep the larger picture seen before.
+    const groups = before && chains(before) > chains(derived) ? before : derived;
+    if (groups.length) this.seenGroups.set(key, groups);
+    const layout: WallLayout = { id: `loops:${primary.id}`, name: primary.name, primary: primary.id, backup: backup?.id, fromLoops: true, groups };
+    const wall = this.layoutWall(layout, primary, backup);
+    if (!groups.length) wall.notes.unshift(primary.reachable ? `${source.name} reports no cable loops yet.` : 'Waiting for the processor to answer.');
+    else wall.notes.push('Drawn from the cable loops. Add this wall in Setup to show the tiles on each chain.');
+    return wall;
   }
 
   private layoutWall(layout: WallLayout, primary: ProcessorView, backup: ProcessorView | undefined): WallView {
@@ -66,7 +98,7 @@ export class Topology {
     }
     const tileSeverity: Severity = !driver.reachable ? 'unknown' : tilesAllOnline ? 'ok' : 'unknown';
     const configuredTiles = layout.groups.reduce((n, g) => n + g.chains.reduce((a, b) => a + b, 0), 0);
-    if (driver.reachable && driver.tiles && configuredTiles !== driver.tiles.associated) {
+    if (!layout.fromLoops && driver.reachable && driver.tiles && configuredTiles !== driver.tiles.associated) {
       notes.push(`The layout has ${configuredTiles} tiles and ${driver.name} knows ${driver.tiles.associated}. Check the layout.`);
     }
 
@@ -84,7 +116,7 @@ export class Topology {
     return {
       id: layout.id,
       name: layout.name,
-      source: 'layout',
+      source: layout.fromLoops ? 'loops' : 'layout',
       severity: worstSeverity([...procSev, ...chainSev.filter((s) => s !== 'unknown' && s !== 'ok')]),
       primary: wallProcessor(primary, backup ? 'primary' : 'single', !backupDriving),
       backup: backup ? wallProcessor(backup, 'backup', backupDriving) : undefined,
@@ -116,12 +148,14 @@ export class Topology {
     const notes: string[] = [];
     if (loop === 'broken') notes.push(`The cable loop from ${a} to ${b} is broken, so this chain has lost its redundant end.`);
     if (loop === 'unknown' && b) notes.push(`${driver.name} does not report a loop for ${a} to ${b}.`);
-    const tiles: TileView[] = Array.from({ length: count }, (_, i) => ({ id: `${id}:${i}`, severity: tileSeverity }));
+    // A wall drawn from loops alone does not know how many tiles a chain has.
+    const tileCount = layout.fromLoops ? 0 : count;
+    const tiles: TileView[] = Array.from({ length: tileCount }, (_, i) => ({ id: `${id}:${i}`, severity: tileSeverity }));
     return {
       id,
       label: b ? `${a} to ${b}` : a,
       tiles,
-      tileCount: count,
+      tileCount,
       from,
       to,
       loop,

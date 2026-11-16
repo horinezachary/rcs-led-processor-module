@@ -176,7 +176,7 @@
       <div class="card"><h3 id="listHead">Processors</h3><div class="scrollx"><table id="procTable"></table></div></div>
       <div class="card">
         <h3>Brompton walls</h3>
-        <p>Tessera does not report where its tiles are, so each Brompton wall is described here once for the Topology page: the processor pair, and for each pair of XD boxes the tiles on each port's chain. A chain runs from port N on the left box to port N on the right box as a cable loop. NovaStar COEX walls come from the processor and need nothing here.</p>
+        <p>The Topology page draws every Brompton wall from its processors' cable loops without any setup. Tessera does not say how many tiles are on each chain, so to show tiles, describe the wall here: the processor pair, and for each pair of XD boxes the tiles on each port's chain. A chain runs from port N on the left box to port N on the right box as a cable loop. NovaStar COEX walls come from the processor and need nothing here.</p>
         <p>"Fill in from" starts from the XD pairs and cabled ports in the processor's last cable loop report, without asking the processor anything. Tessera does not say how many tiles are on each chain, so new chains share its tile count evenly: check each one.</p>
         <div id="wallEdit" style="display: flex; flex-direction: column; gap: 14px"></div>
         <div class="row"><rcs-button id="addWall">Add a wall</rcs-button><div class="grow"></div><span class="note" id="wallsDirty"></span><rcs-button id="discardWalls">Discard changes</rcs-button><rcs-button id="saveWalls" variant="primary">Save walls</rcs-button></div>
@@ -536,7 +536,7 @@
         const chains = w.groups.reduce((n, g) => n + g.chains.length, 0);
         const tiles = w.groups.reduce((n, g) => n + g.chains.reduce((m, c) => m + c.tileCount, 0), 0);
         const boxes = w.groups.reduce((n, g) => n + (g.right ? 2 : 1), 0);
-        return [w.backup ? 'Redundant pair' : 'Single processor', w.source === 'layout' ? plural(boxes, 'distribution box') : plural(boxes, 'output group'), plural(chains, 'chain'), plural(tiles, 'tile')].join(' · ');
+        return [w.backup ? 'Redundant pair' : 'Single processor', w.source === 'processor' ? plural(boxes, 'output group') : plural(boxes, 'distribution box'), plural(chains, 'chain'), w.source === 'loops' ? 'from cable loops' : plural(tiles, 'tile')].join(' · ');
       }
 
       function drawTopology() {
@@ -544,7 +544,7 @@
         host.replaceChildren();
         if (!s.walls.length) {
           const c = el('div', { class: 'card' });
-          c.append(el('h3', {}, 'No walls to draw yet'), el('p', {}, 'NovaStar COEX walls are drawn from the processor\'s own cabinet map. A Brompton wall needs a layout: add one under Brompton walls in Setup, naming the processor pair and the tiles on each port of each XD box.'));
+          c.append(el('h3', {}, 'No walls to draw yet'), el('p', {}, 'Brompton walls are drawn from each processor\'s cable loops, and COEX walls from the processor\'s own cabinet map. A VX Pro reports neither.'));
           host.append(c);
         }
         for (const w of s.walls) host.append(wallCard(w));
@@ -714,8 +714,8 @@
             if (c.to && g.right) rows.push(['Redundant end', `${g.right.name} port ${c.to.label} · ${PORT[c.to.state].toLowerCase()}`, c.to.state === 'lost']);
             rows.push(['Cable loop', loop, c.loop === 'broken']);
             if (c.from.load) rows.push(['Port load', `${Math.round(c.from.load.percent)}% · ${fmt(c.from.load.pixels)} of ${fmt(c.from.load.capacity)} px`, c.from.load.percent >= s.thresholds.portLoadWarnPercent]);
-            rows.push(['Tiles', bad.length ? `${bad.length} with problems` : c.tiles.some((t) => t.severity === 'ok') ? 'All OK' : 'Count only', bad.length > 0]);
-            const out = [el('h4', {}, `Chain ${c.label}`), el('p', {}, `${w.name} · ${plural(c.tileCount, 'tile')}`), kv(rows)];
+            rows.push(['Tiles', bad.length ? `${bad.length} with problems` : c.tiles.some((t) => t.severity === 'ok') ? 'All OK' : w.source === 'loops' ? 'Not set: add this wall in Setup' : 'Count only', bad.length > 0]);
+            const out = [el('h4', {}, `Chain ${c.label}`), el('p', {}, `${w.name} · ${w.source === 'loops' ? 'tile count not set' : plural(c.tileCount, 'tile')}`), kv(rows)];
             for (const t of bad) {
               const d = el('div', { class: 'alert ' + t.severity });
               d.append(el('span', { class: 'dot' }), `${t.label ?? t.id}${t.detail ? ' · ' + t.detail : ''}`);

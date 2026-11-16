@@ -16,8 +16,9 @@ come from [LEDScreenControl](https://github.com/horinezachary/LEDScreenControl).
 - **Topology**: each wall as a diagram, as in LEDScreenControl. The processor that normally drives
   the wall on top, its backup underneath, the distribution boxes as columns and each tile chain as a
   row between a pair of boxes: solid where signal is driven, dashed where a path is standby, red where
-  it is lost. A broken Tessera cable loop is pinned to its chain. COEX walls come from the processor's
-  own cabinet map, with port loads. Brompton walls need a layout (below). Tap a processor, box or chain
+  it is lost. A broken Tessera cable loop is pinned to its chain. Every Brompton processor (with its
+  failover partner) is drawn from its cable loops with no setup; a layout (below) adds the tiles on
+  each chain. COEX walls come from the processor's own cabinet map, with port loads. Tap a processor, box or chain
   for its details; the header tabs choose the wall on this screen only.
 - **Setup**: processors by address (or found by a network scan), Allow controls, and the alert limits.
 
@@ -28,8 +29,8 @@ COEX port capacity.
 
 ### Brompton wall layouts
 
-Tessera reports processor health, failover and cable loops but not where tiles are, so each Brompton
-wall is described once under **Brompton walls** in the web view's Setup: the processor pair, and for
+Without a layout, a Brompton wall is drawn from its cable loops. Tessera does not report how many
+tiles are on each chain, so to show tiles, a wall is described once under **Brompton walls** in the web view's Setup: the processor pair, and for
 each pair of XD boxes the trunk letters and the tiles on each port's chain (a chain runs from port N
 on the left box to port N on the right box). **Fill in from** starts from the XD pairs and cabled ports
 in the processor's last cable loop report, without asking the processor anything; Tessera does not say
