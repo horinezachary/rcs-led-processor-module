@@ -1,0 +1,172 @@
+// Health rules: turn a snapshot into alerts. Each alert has a stable key, so the monitor can tell a new problem from
+// one that is still going, and keep the time it started.
+import type { Alert, ProcessorSnapshot, ProcessorTopology, Severity, TileTemperature } from './shared.js';
+import { SEVERITY_ORDER, worstSeverity } from './shared.js';
+import type { Thresholds } from './thresholds.js';
+
+export type NewAlert = Omit<Alert, 'since'>;
+
+export function evaluate(
+  snap: ProcessorSnapshot,
+  thresholds: Thresholds,
+  previous: Alert[] = [],
+  now = Date.now(),
+  extra: NewAlert[] = [],
+): { alerts: Alert[]; severity: Severity } {
+  const found = [...check(snap, thresholds), ...extra];
+  const before = new Map(previous.map((a) => [a.key, a]));
+  const alerts = found.map((a) => ({ ...a, since: before.get(a.key)?.since ?? now }));
+  if (!snap.reachable && snap.lastSeen === undefined && snap.missedPolls === 0) {
+    // Never polled yet.
+    return { alerts, severity: 'unknown' };
+  }
+  return { alerts, severity: worstSeverity(alerts.map((a) => a.severity)) };
+}
+
+function check(s: ProcessorSnapshot, t: Thresholds): NewAlert[] {
+  const out: NewAlert[] = [];
+
+  if (!s.reachable) {
+    if (s.missedPolls >= t.unreachableAfterPolls) {
+      out.push({ key: 'unreachable', rule: 'unreachable', severity: 'critical', message: `Not responding (${s.lastError ?? 'no answer'})` });
+    } else if (s.missedPolls > 0) {
+      out.push({ key: 'unreachable', rule: 'unreachable', severity: 'warning', message: `Missed ${s.missedPolls} poll${s.missedPolls === 1 ? '' : 's'}` });
+    }
+    // Everything else is stale while it is unreachable, so it is not judged.
+    return out;
+  }
+
+  const active = s.inputs.find((i) => i.active);
+  if (active && !active.signal) {
+    out.push({ key: 'signal', rule: 'signal', severity: 'critical', message: `No signal on the active input (${active.label})` });
+  }
+
+  for (const r of s.temperatures) {
+    if (r.value >= t.tempCritC) {
+      out.push({ key: `temp:${r.key}`, rule: 'temperature', severity: 'critical', message: `${r.label} at ${r.value.toFixed(1)} °C (limit ${t.tempCritC} °C)` });
+    } else if (r.value >= t.tempWarnC) {
+      out.push({ key: `temp:${r.key}`, rule: 'temperature', severity: 'warning', message: `${r.label} at ${r.value.toFixed(1)} °C (warning at ${t.tempWarnC} °C)` });
+    }
+  }
+
+  // Tiles: one alert for the whole wall, naming the hottest, so a warm wall does not raise one alert per cabinet.
+  const tileTemps = s.tileTemperatures ?? [];
+  const hot = tileTemps.filter((r) => r.value >= t.tileTempWarnC).sort((a, b) => b.value - a.value);
+  if (hot.length) {
+    const crit = hot.filter((r) => r.value >= t.tileTempCritC).length;
+    const top = hot[0];
+    const count = crit || hot.length;
+    const limit = crit ? t.tileTempCritC : t.tileTempWarnC;
+    out.push({
+      key: 'tile-temp',
+      rule: 'tile-temperature',
+      severity: crit ? 'critical' : 'warning',
+      message: `${count} tile${count === 1 ? '' : 's'} at or above ${limit} °C, hottest ${top.label} at ${top.value.toFixed(1)} °C`,
+    });
+  }
+
+  for (const f of s.fans) {
+    if (!f.running) {
+      out.push({ key: `fan:${f.key}`, rule: 'fan', severity: 'critical', message: `${f.label} has stopped` });
+    } else if (t.fanMinRpm > 0 && f.rpm !== undefined && f.rpm < t.fanMinRpm) {
+      out.push({ key: `fan:${f.key}`, rule: 'fan', severity: 'warning', message: `${f.label} slow at ${Math.round(f.rpm)} RPM` });
+    }
+  }
+
+  if (s.tiles && s.tiles.associated > 0) {
+    const offline = s.tiles.associated - s.tiles.online;
+    if (offline > 0) {
+      const pct = (offline / s.tiles.associated) * 100;
+      out.push({
+        key: 'tiles-offline',
+        rule: 'tiles',
+        severity: pct >= t.tilesOfflineCritPercent ? 'critical' : 'warning',
+        message: `${offline} of ${s.tiles.associated} tiles offline`,
+      });
+    }
+    if (s.tiles.errors > 0) {
+      out.push({ key: 'tile-errors', rule: 'tiles', severity: 'warning', message: `${s.tiles.errors} tile${s.tiles.errors === 1 ? '' : 's'} reporting errors` });
+    }
+    const versions = Object.keys(s.tiles.firmware);
+    if (versions.length > 1) {
+      out.push({ key: 'tile-firmware', rule: 'firmware', severity: 'warning', message: `Tiles on ${versions.length} firmware versions: ${versions.join(', ')}` });
+    }
+  }
+
+  // Processors that report their own topology (COEX): port loads, port faults and broken links between cabinets.
+  for (const g of s.topology?.groups ?? []) {
+    for (const c of g.chains) {
+      const load = c.from.load;
+      if (load && load.percent > 100) {
+        out.push({ key: `port-load:${c.id}`, rule: 'port-load', severity: 'critical', message: `${c.label} over capacity at ${Math.round(load.percent)}% (${load.pixels.toLocaleString('en-US')} pixels)` });
+      } else if (load && load.percent >= t.portLoadWarnPercent) {
+        out.push({ key: `port-load:${c.id}`, rule: 'port-load', severity: 'warning', message: `${c.label} at ${Math.round(load.percent)}% of capacity` });
+      }
+      if (c.from.state === 'lost') out.push({ key: `port:${c.id}`, rule: 'port', severity: 'critical', message: `${c.label} reports an output fault` });
+      if (c.notes.some((n) => n.startsWith('A cabinet reports the link'))) {
+        out.push({ key: `link:${c.id}`, rule: 'cabinet-link', severity: 'warning', message: `${c.label}: link between cabinets down` });
+      }
+    }
+  }
+
+  const f = s.failover;
+  if (f?.enabled) {
+    if (f.partnerPresent === false) {
+      out.push({ key: 'partner', rule: 'failover', severity: 'warning', message: `Redundant partner ${f.partnerName ?? ''} not seen`.replace(/\s+/g, ' ').trim() });
+    }
+    if (f.active && f.role === 'primary') {
+      out.push({ key: 'failover-active', rule: 'failover', severity: 'critical', message: 'Failover active: the backup processor is driving the wall' });
+    } else if (f.active && f.role === 'backup') {
+      out.push({ key: 'failover-active', rule: 'failover', severity: 'warning', message: 'This backup processor is driving the wall' });
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Cable loops need memory: Tessera lists every possible loop, and most say "no-loop-found" because nothing is cabled
+ * that way. Only a loop that was found earlier and is now lost is a problem.
+ */
+export function loopAlerts(s: ProcessorSnapshot, everFound: Map<string, string>): NewAlert[] {
+  if (!s.reachable) return [];
+  const out: NewAlert[] = [];
+  for (const loop of s.loops) {
+    if (loop.found) {
+      // "loop-found: A1->B1" names both ports; a lost loop names only the first, so remember the pair.
+      everFound.set(loop.key, loop.port && loop.to ? `${loop.port} to ${loop.to}` : (loop.port ?? `loop ${loop.index}`));
+    } else if (everFound.has(loop.key)) {
+      out.push({ key: `loop:${loop.key}`, rule: 'cable-loop', severity: 'warning', message: `Cable loop ${everFound.get(loop.key)} broken (${loop.state})` });
+    }
+  }
+  return out;
+}
+
+function tempSeverity(value: number, t: Thresholds): Severity {
+  return value >= t.tileTempCritC ? 'critical' : value >= t.tileTempWarnC ? 'warning' : 'ok';
+}
+
+/** Marks tiles in a processor's own topology warning or critical when their temperature crosses the tile limits. */
+export function markHotTiles(topology: ProcessorTopology | undefined, temps: TileTemperature[] | undefined, t: Thresholds): ProcessorTopology | undefined {
+  if (!topology || !temps?.length) return topology;
+  const byKey = new Map(temps.map((r) => [r.key, r.value]));
+  const worse = (a: Severity, b: Severity) => (SEVERITY_ORDER.indexOf(a) <= SEVERITY_ORDER.indexOf(b) ? a : b);
+  return {
+    ...topology,
+    groups: topology.groups.map((g) => ({
+      ...g,
+      chains: g.chains.map((c) => {
+        const tiles = c.tiles.map((tile) => {
+          const v = byKey.get(tile.id);
+          if (v === undefined) return tile;
+          const sev = tempSeverity(v, t);
+          if (sev === 'ok') return tile;
+          const note = `${v.toFixed(1)} °C, ${sev === 'critical' ? 'over' : 'near'} the tile limit`;
+          return { ...tile, severity: worse(tile.severity, sev), detail: tile.detail?.includes('°C') ? note : [tile.detail, note].filter(Boolean).join(' · ') };
+        });
+        const sev = tiles.reduce<Severity>((a, x) => (x.severity === 'unknown' ? a : worse(a, x.severity)), c.severity);
+        return { ...c, tiles, severity: sev };
+      }),
+    })),
+  };
+}

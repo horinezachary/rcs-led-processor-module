@@ -1,0 +1,437 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { height: 100%; overflow: hidden; }
+      main { height: 100%; display: flex; flex-direction: column; padding: 14px 28px 16px; gap: 12px; box-sizing: border-box; }
+      header { display: flex; align-items: center; gap: 14px; min-height: 48px; }
+      h1 { margin: 0; font-size: 26px; font-weight: 700; white-space: nowrap; }
+      .note { margin: 0; color: var(--rcs-muted); font-size: 14px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+      .grow { flex: 1; }
+      .scroll { flex: 1; min-height: 0; overflow-y: auto; }
+      .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+      .empty p { margin: 0; color: var(--rcs-muted); font-size: 17px; max-width: 900px; line-height: 1.5; }
+
+      .ok { --sev: var(--rcs-ok); } .warning { --sev: var(--rcs-warn); } .critical { --sev: var(--rcs-error); } .unknown { --sev: var(--rcs-muted); }
+      .pill { height: 30px; padding: 0 12px; border-radius: 15px; font: 700 13.5px var(--rcs-font); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+        color: var(--sev); background: color-mix(in srgb, var(--sev) 12%, transparent); border: 1px solid color-mix(in srgb, var(--sev) 40%, transparent); }
+      .dot { display: inline-block; width: 9px; height: 9px; border-radius: 5px; background: var(--sev); flex: none; }
+      .tabs { display: flex; gap: 8px; overflow: hidden; }
+      .tabs button { height: 44px; padding: 0 16px; border-radius: 10px; font: 600 15px var(--rcs-font); color: var(--rcs-text); background: var(--rcs-surface);
+        border: 1px solid var(--rcs-border); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+      rcs-tabs button { white-space: nowrap; }
+      .tabs button[aria-pressed=true] { border-color: var(--rcs-accent); color: var(--rcs-accent); }
+      .label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--rcs-muted); }
+      .badge { font: 700 12px var(--rcs-font); letter-spacing: 0.06em; padding: 3px 8px; border-radius: 6px; border: 1px solid currentColor; white-space: nowrap; }
+
+      /* overview */
+      #view-overview { overflow-x: auto; overflow-y: hidden; }
+      .cards { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(420px, 1fr); gap: 12px; height: 100%; }
+      .card { border: 1px solid var(--rcs-border); border-radius: 14px; background: var(--rcs-surface); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;
+        text-align: left; color: var(--rcs-text); font: inherit; cursor: pointer; min-width: 0; height: 100%; box-sizing: border-box; overflow: hidden; }
+      .card.sel { border-color: var(--rcs-accent); box-shadow: inset 0 0 0 1px var(--rcs-accent); }
+      .card .top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+      .card .n { font-size: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .card .m { font: 13px var(--rcs-mono); color: var(--rcs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+      .alerts { display: flex; flex-direction: column; gap: 3px; min-height: 22px; }
+      .alerts span { font-size: 14px; color: var(--sev); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
+      .alerts .none { color: var(--rcs-muted); }
+      .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 16px; }
+      .facts div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .facts .v { font: 600 15px var(--rcs-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .facts .v.bad { color: var(--rcs-error); }
+      .badges { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+      .badges .blk { color: var(--rcs-error); } .badges .frz { color: #4C9AFF; } .badges .pre { color: var(--rcs-accent); } .badges .ro { color: var(--rcs-muted); }
+      .card .why { font-size: 14px; color: var(--rcs-muted); line-height: 1.4; }
+
+      /* alerts */
+      .two { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .box { border: 1px solid var(--rcs-border); border-radius: 14px; background: var(--rcs-surface); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+      .rows { overflow-y: auto; display: flex; flex-direction: column; }
+      .row { display: grid; grid-template-columns: 96px 160px 1fr auto; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--rcs-border); font-size: 15px; }
+      .row:last-child { border-bottom: 0; }
+      .row .s { font-weight: 700; color: var(--sev); font-size: 13px; letter-spacing: 0.05em; }
+      .row .p { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .row .t { color: var(--rcs-muted); font: 13px var(--rcs-mono); white-space: nowrap; }
+      .ev { display: grid; grid-template-columns: 76px 74px 1fr; gap: 10px; padding: 5px 0; font-size: 14px; border-bottom: 1px solid var(--rcs-border); }
+      .ev .t { font: 13px var(--rcs-mono); color: var(--rcs-muted); }
+      .ev .l { font-weight: 700; font-size: 12px; letter-spacing: 0.05em; color: var(--sev); }
+      .ev .msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ev.info { --sev: var(--rcs-muted); }
+
+      /* loops */
+      .loops { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+      .loopgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; overflow-y: auto; align-content: start; }
+      .loop { border: 1px solid var(--rcs-border); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; background: var(--rcs-bg); }
+      .loop .a { font: 700 16px var(--rcs-mono); }
+      .loop .b { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--sev); }
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .stats div { display: flex; flex-direction: column; gap: 2px; }
+      .stats .v { font: 700 26px var(--rcs-mono); }
+      .fw { display: flex; justify-content: space-between; font: 15px var(--rcs-mono); padding: 4px 0; }
+      .chains { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+      .chain { display: grid; grid-template-columns: 90px 1fr 170px; gap: 12px; align-items: center; }
+      .chain .pn { font: 700 15px var(--rcs-mono); display: flex; align-items: center; gap: 8px; }
+      .tiles { display: flex; gap: 2px; flex-wrap: nowrap; overflow: hidden; height: 26px; }
+      .tiles i { flex: 1; min-width: 6px; max-width: 26px; border-radius: 3px; background: color-mix(in srgb, var(--sev) 70%, transparent); }
+      .bar { height: 10px; border-radius: 5px; background: var(--rcs-bg); border: 1px solid var(--rcs-border); overflow: hidden; }
+      .bar b { display: block; height: 100%; background: var(--sev); }
+      .load { display: flex; flex-direction: column; gap: 3px; font: 12px var(--rcs-mono); color: var(--rcs-muted); }
+
+      /* setup */
+      .setup { flex: 1; min-height: 0; display: grid; grid-template-columns: 400px 1fr 660px; gap: 22px; }
+      .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+      .toggle { display: flex; align-items: center; gap: 14px; font-size: 16px; }
+      .list { border: 1px solid var(--rcs-border); border-radius: 12px; background: var(--rcs-surface); overflow-y: auto; }
+      .item { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--rcs-border); }
+      .item:last-child { border-bottom: 0; }
+      .item .t { flex: 1; min-width: 0; }
+      .item .n { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .item .d { font: 13px var(--rcs-mono); color: var(--rcs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .limits { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 12px; }
+
+      .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #3A2A0E; border: 2px solid var(--rcs-accent); color: #FFE2B0;
+        padding: 10px 20px; border-radius: 12px; font-size: 17px; font-weight: 600; white-space: nowrap; z-index: 50; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1 id="title">LED processors</h1>
+        <span class="pill" id="overall"><span class="dot"></span><span id="overallText"></span></span>
+        <span class="note" id="sub"></span>
+        <div class="grow"></div>
+        <div class="tabs" id="procTabs" role="group" aria-label="Processor"></div>
+      </header>
+
+      <div class="empty" id="empty" hidden>
+        <p>No processors yet. Add Brompton Tessera and NovaStar processors by address in Setup, or scan the network for them. The module only reads from them until you turn on Allow controls.</p>
+        <rcs-button id="emptySetup" variant="primary">Open Setup</rcs-button>
+      </div>
+
+      <section id="view-overview" style="flex: 1; min-height: 0" hidden><div class="cards" id="cards"></div></section>
+
+      <section id="view-alerts" class="two" hidden>
+        <div class="box"><span class="label" id="alertsHead">ACTIVE ALERTS</span><div class="rows" id="alertRows"></div></div>
+        <div class="box"><span class="label">EVENT LOG</span><div class="rows" id="events"></div></div>
+      </section>
+
+      <section id="view-loops" class="loops" hidden>
+        <div class="box"><span class="label" id="loopHead"></span><div id="loopMain" style="min-height: 0; display: flex; flex-direction: column; flex: 1"></div></div>
+        <div class="box"><span class="label" id="sideHead">TILES</span><div id="loopSide" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto"></div></div>
+      </section>
+
+      <section id="view-setup" class="setup" hidden>
+        <div class="col">
+          <span class="label">ADD A PROCESSOR</span>
+          <rcs-tabs id="kind" value="brompton">
+            <button value="brompton">Brompton</button>
+            <button value="coex">COEX</button>
+            <button value="vxpro">VX Pro</button>
+            <button value="device">Other</button>
+          </rcs-tabs>
+          <rcs-field id="address" label="IP address" kind="ip" placeholder="10.10.20.11"></rcs-field>
+          <div style="display: flex; gap: 10px"><rcs-button id="scan">Scan network</rcs-button></div>
+          <label class="toggle"><rcs-toggle id="allowControls" label="Allow controls"></rcs-toggle>Allow controls: presets, brightness, freeze, blackout</label>
+        </div>
+        <div class="col">
+          <span class="label" id="listHead">PROCESSORS</span>
+          <div class="list" id="procList"></div>
+          <span class="label" id="foundHead" hidden>FOUND ON THE NETWORK</span>
+          <div class="list" id="found" hidden></div>
+        </div>
+        <div class="col">
+          <span class="label">ALERT LIMITS</span>
+          <div class="limits" id="limits"></div>
+          <p class="note" style="white-space: normal">Named saves hold the processor list, these limits and Allow controls. Restoring one never sends anything to a processor.</p>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+
+    <rcs-dialog id="confirm">
+      <span id="confirmText"></span>
+      <div slot="buttons">
+        <rcs-button id="no">Cancel</rcs-button>
+        <rcs-button id="yes" variant="danger">OK</rcs-button>
+      </div>
+    </rcs-dialog>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const TITLES = { overview: 'LED processors', alerts: 'Alerts', loops: 'Loops and tiles', setup: 'Setup' };
+      const SEV = { ok: 'OK', warning: 'Warning', critical: 'Critical', unknown: 'Unknown' };
+      const KIND = { brompton: 'Brompton', coex: 'NovaStar COEX', vxpro: 'NovaStar VX Pro', device: 'Device' };
+      const LIMITS = [
+        ['tempWarnC', 'Processor warn °C'], ['tempCritC', 'Processor crit °C'], ['fanMinRpm', 'Fan min RPM'],
+        ['tileTempWarnC', 'Tile warn °C'], ['tileTempCritC', 'Tile crit °C'], ['portLoadWarnPercent', 'Port load warn %'],
+        ['tilesOfflineCritPercent', 'Tiles offline crit %'], ['unreachableAfterPolls', 'Missed polls, crit']
+      ];
+      let s = null;
+      let onYes = null;
+
+      function el(tag, attrs = {}, text) {
+        const e = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          if (v === true) e.setAttribute(k, '');
+          else if (v !== false && v != null) e.setAttribute(k, String(v));
+        }
+        if (text != null) e.textContent = text;
+        return e;
+      }
+      const button = (text, variant, fn, disabled) => {
+        const b = el('rcs-button', { size: 'small', variant, disabled: !!disabled }, text);
+        b.addEventListener('click', (e) => { e.stopPropagation(); if (!disabled) fn(); });
+        return b;
+      };
+      function ask(text, ok, variant, fn) {
+        $('confirmText').textContent = text;
+        $('yes').textContent = ok;
+        $('yes').setAttribute('variant', variant);
+        onYes = fn;
+        $('confirm').show();
+      }
+      $('no').onclick = () => $('confirm').close();
+      $('yes').onclick = () => { $('confirm').close(); onYes?.(); };
+      const clock = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'now' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+      const cur = () => s?.processors.find((p) => p.id === s.current);
+      const fmt = (n) => Number(n).toLocaleString('en-US');
+
+      function draw() {
+        if (!s) return;
+        const v = s.view;
+        const none = !s.processors.length && v !== 'setup';
+        $('title').textContent = TITLES[v];
+        $('overall').className = 'pill ' + s.severity;
+        $('overallText').textContent = s.processors.length ? (s.severity === 'ok' ? 'All OK' : `${SEV[s.severity]}${s.alerts.length ? ` · ${s.alerts.length} alert${s.alerts.length > 1 ? 's' : ''}` : ''}`) : 'No processors';
+        $('sub').textContent = `Polling every ${s.pollSeconds} s · ${s.allowControls ? 'commands need a second key press' : 'read only'}`;
+        $('empty').hidden = !none;
+        for (const x of ['overview', 'alerts', 'loops', 'setup']) $('view-' + x).hidden = none || v !== x;
+        drawTabs();
+        if (!none) ({ overview: drawOverview, alerts: drawAlerts, loops: drawLoops, setup: drawSetup })[v]();
+        const t = $('toast');
+        t.hidden = !s.armed?.what;
+        if (s.armed?.what) t.textContent = `Press the key again to send: ${s.armed.what}`;
+      }
+
+      function drawTabs() {
+        const box = $('procTabs');
+        box.replaceChildren();
+        box.hidden = s.view === 'setup' || s.view === 'alerts' || s.processors.length < 2;
+        for (const p of s.processors) {
+          const b = el('button', { 'aria-pressed': p.id === s.current, class: p.severity });
+          b.append(el('span', { class: 'dot' }), p.name);
+          b.onclick = () => rcs.send({ type: 'select', id: p.id });
+          box.append(b);
+        }
+      }
+
+      function fact(label, value, bad) {
+        const d = el('div');
+        d.append(el('span', { class: 'label' }, label), el('span', { class: 'v' + (bad ? ' bad' : '') }, value || '–'));
+        return d;
+      }
+
+      function drawOverview() {
+        const box = $('cards');
+        box.replaceChildren();
+        for (const p of s.processors) {
+          const c = el('button', { class: 'card ' + p.severity + (p.id === s.current ? ' sel' : '') });
+          c.onclick = () => rcs.send({ type: 'select', id: p.id });
+          const top = el('div', { class: 'top' });
+          top.append(el('span', { class: 'n' }, p.name), el('span', { class: 'm' }, `${p.model || KIND[p.kind]} · ${p.host}`));
+          const pill = el('span', { class: 'pill ' + p.severity });
+          pill.append(el('span', { class: 'dot' }), p.reachable ? SEV[p.severity] : p.lastSeen ? 'Not answering' : 'Connecting');
+          top.append(pill);
+          c.append(top);
+          const al = el('div', { class: 'alerts' });
+          for (const a of p.alerts.slice(0, 2)) {
+            const line = el('span', { class: a.severity });
+            line.append(el('span', { class: 'dot' }), a.message);
+            al.append(line);
+          }
+          if (p.alerts.length > 2) al.append(el('span', { class: 'none' }, `and ${p.alerts.length - 2} more`));
+          if (!p.alerts.length) al.append(el('span', { class: 'none' }, p.reachable ? 'No alerts' : p.lastError || 'Waiting for the first answer'));
+          c.append(al);
+          if (p.note) c.append(el('div', { class: 'why' }, p.note));
+          if (p.kind !== 'device' && !p.note) {
+            const f = el('div', { class: 'facts' });
+            f.append(
+              fact('INPUT', p.input, !p.inputOk),
+              fact('GENLOCK', p.genlock),
+              fact('HOTTEST', p.hottest ? `${p.hottest.label} ${p.hottest.value.toFixed(1)} °C` : ''),
+              fact('FANS', p.fans, !p.fansOk),
+              fact('TILES', p.tiles ? `${fmt(p.tiles.online)} of ${fmt(p.tiles.associated)} online` : '', p.tiles && p.tiles.online < p.tiles.associated),
+              fact(p.tileTemp ? 'HOTTEST TILE' : 'REDUNDANCY', p.tileTemp ? `${p.tileTemp.hottest.toFixed(1)} °C · avg ${p.tileTemp.average}` : p.redundancy),
+              fact('BRIGHTNESS', p.brightnessText),
+              fact('FIRMWARE', [p.firmware, p.uptime && `up ${p.uptime}`].filter(Boolean).join(' · '))
+            );
+            c.append(f);
+          }
+          const b = el('div', { class: 'badges' });
+          if (p.blackout) b.append(el('span', { class: 'badge blk' }, 'BLACKOUT'));
+          if (p.freeze) b.append(el('span', { class: 'badge frz' }, 'FROZEN'));
+          if (p.preset) b.append(el('span', { class: 'badge pre' }, `PRESET ${p.preset.number}${p.preset.name ? ' · ' + p.preset.name.toUpperCase() : ''}`));
+          if (p.tileTemp && p.redundancy) b.append(el('span', { class: 'badge ro' }, p.redundancy.toUpperCase()));
+          c.append(b);
+          box.append(c);
+        }
+      }
+
+      function drawAlerts() {
+        $('alertsHead').textContent = `ACTIVE ALERTS · ${s.alerts.length}`;
+        const rows = $('alertRows');
+        rows.replaceChildren();
+        if (!s.alerts.length) rows.append(el('p', { class: 'note' }, 'Nothing needs attention.'));
+        for (const a of s.alerts) {
+          const r = el('div', { class: 'row ' + a.severity });
+          r.append(el('span', { class: 's' }, a.severity.toUpperCase()), el('span', { class: 'p' }, a.procName), el('span', {}, a.message), el('span', { class: 't' }, ago(a.since)));
+          rows.append(r);
+        }
+        const ev = $('events');
+        ev.replaceChildren();
+        for (const e of s.events) {
+          const r = el('div', { class: 'ev ' + e.level });
+          r.append(el('span', { class: 't' }, clock(e.time)), el('span', { class: 'l' }, e.level.toUpperCase()), el('span', { class: 'msg', title: e.message }, e.message));
+          ev.append(r);
+        }
+      }
+
+      function drawLoops() {
+        const o = s.outputs;
+        const main = $('loopMain');
+        const side = $('loopSide');
+        main.replaceChildren();
+        side.replaceChildren();
+        if (!o) return;
+        if (o.topology?.groups?.length) {
+          $('loopHead').textContent = `OUTPUT PORTS · ${o.name}`;
+          const list = el('div', { class: 'chains' });
+          for (const g of o.topology.groups) {
+            if (o.topology.groups.length > 1) list.append(el('span', { class: 'label' }, g.left.name));
+            for (const ch of g.chains) {
+              const r = el('div', { class: 'chain ' + ch.severity });
+              const pn = el('span', { class: 'pn' });
+              pn.append(el('span', { class: 'dot' }), ch.label);
+              const tiles = el('div', { class: 'tiles' });
+              for (const t of ch.tiles) tiles.append(el('i', { class: t.severity, title: `${t.label}: ${t.detail ?? ''}` }));
+              const load = el('div', { class: 'load ' + (ch.from.load?.percent > 100 ? 'critical' : ch.from.load?.percent >= s.thresholds.portLoadWarnPercent ? 'warning' : 'ok') });
+              if (ch.from.load) {
+                const bar = el('div', { class: 'bar' });
+                bar.append(el('b', { style: `width: ${Math.min(100, ch.from.load.percent)}%` }));
+                load.append(bar, el('span', {}, `${Math.round(ch.from.load.percent)}% · ${ch.tileCount} cabinets`));
+              }
+              r.append(pn, tiles, load);
+              list.append(r);
+            }
+          }
+          main.append(list);
+        } else if (o.loops.length) {
+          const found = o.loops.filter((l) => l.found).length;
+          $('loopHead').textContent = `CABLE LOOPS · ${o.name} · ${found} of ${o.loops.length} found`;
+          const grid = el('div', { class: 'loopgrid' });
+          for (const l of o.loops) {
+            const d = el('div', { class: 'loop ' + (l.found ? 'ok' : 'unknown') });
+            d.append(el('span', { class: 'a' }, l.port ? `${l.port}${l.to ? ' → ' + l.to : ''}` : `Loop ${l.index}`), el('span', { class: 'b' }, l.found ? 'LOOP FOUND' : 'NO LOOP'));
+            grid.append(d);
+          }
+          main.append(grid);
+        } else {
+          $('loopHead').textContent = o.name;
+          main.append(el('p', { class: 'note', style: 'white-space: normal' }, o.kind === 'brompton' ? 'The processor reports no cable loops.' : o.kind === 'vxpro' ? 'A VX Pro on its control protocol reports no outputs or tiles.' : o.kind === 'device' ? 'This device is only checked for an answer.' : 'The processor reports no cabinets yet.'));
+        }
+        $('sideHead').textContent = 'TILES';
+        if (o.tiles) {
+          const st = el('div', { class: 'stats' });
+          const stat = (k, v, bad) => { const d = el('div'); d.append(el('span', { class: 'label' }, k), el('span', { class: 'v', style: bad ? 'color: var(--rcs-error)' : '' }, fmt(v))); return d; };
+          st.append(stat('ASSOCIATED', o.tiles.associated), stat('ONLINE', o.tiles.online, o.tiles.online < o.tiles.associated), stat('ERRORS', o.tiles.errors, o.tiles.errors > 0));
+          side.append(st);
+          const fw = Object.entries(o.tiles.firmware);
+          if (fw.length) {
+            side.append(el('span', { class: 'label' }, 'TILE FIRMWARE'));
+            for (const [ver, n] of fw) {
+              const r = el('div', { class: 'fw' });
+              r.append(el('span', {}, ver), el('span', { style: 'color: var(--rcs-muted)' }, `${fmt(n)} tile${n === 1 ? '' : 's'}`));
+              side.append(r);
+            }
+          }
+        }
+        if (o.tileTemperatures.length) {
+          const hot = [...o.tileTemperatures].sort((a, b) => b.value - a.value).slice(0, 4);
+          side.append(el('span', { class: 'label' }, 'HOTTEST TILES'));
+          for (const t of hot) {
+            const r = el('div', { class: 'fw ' + (t.value >= s.thresholds.tileTempCritC ? 'critical' : t.value >= s.thresholds.tileTempWarnC ? 'warning' : 'ok') });
+            r.append(el('span', {}, t.label), el('span', { style: 'color: var(--sev)' }, `${t.value.toFixed(1)} °C`));
+            side.append(r);
+          }
+        }
+        if (o.topology?.notes?.length) for (const n of o.topology.notes) side.append(el('p', { class: 'note', style: 'white-space: normal' }, n));
+        if (!o.tiles && !o.tileTemperatures.length) side.append(el('p', { class: 'note' }, 'No tile counts reported.'));
+      }
+
+      function drawSetup() {
+        $('allowControls').checked = s.allowControls;
+        $('scan').textContent = s.scanning ? 'Scanning…' : 'Scan network';
+        $('scan').toggleAttribute('disabled', s.scanning);
+        $('listHead').textContent = `PROCESSORS · ${s.entries.length} of 12`;
+        const list = $('procList');
+        list.replaceChildren();
+        if (!s.entries.length) list.append(el('div', { class: 'item' }, 'None yet'));
+        for (const e of s.entries) {
+          const p = s.processors.find((x) => x.id === e.id);
+          const row = el('div', { class: 'item ' + (p?.severity ?? 'unknown') });
+          const t = el('div', { class: 't' });
+          t.append(el('div', { class: 'n' }, p?.name || e.label || e.host), el('div', { class: 'd' }, `${KIND[e.kind]} · ${e.host}${e.port ? ':' + e.port : ''}${p?.reachable ? '' : p?.lastError ? ' · ' + p.lastError : ''}`));
+          row.append(el('span', { class: 'dot' }), t, button('Remove', 'danger', () => ask(`Remove ${p?.name || e.host} from this module? Nothing changes on the processor.`, 'Remove', 'danger', () => rcs.send({ type: 'remove', id: e.id }))));
+          list.append(row);
+        }
+        const known = new Set(s.entries.map((e) => e.host + ':' + e.port));
+        $('found').hidden = $('foundHead').hidden = !s.found.length;
+        const f = $('found');
+        f.replaceChildren();
+        for (const x of s.found) {
+          const row = el('div', { class: 'item' });
+          const t = el('div', { class: 't' });
+          t.append(el('div', { class: 'n' }, x.name || x.model || x.host), el('div', { class: 'd' }, `${KIND[x.kind]} · ${x.host}${x.port ? ':' + x.port : ''}${x.model ? ' · ' + x.model : ''}`));
+          const added = known.has(x.host + ':' + x.port);
+          row.append(t, button(added ? 'Added' : 'Add', added ? undefined : 'primary', () => rcs.send({ type: 'add', kind: x.kind, host: x.host, port: x.port }), added));
+          f.append(row);
+        }
+        const lim = $('limits');
+        if (!lim.childElementCount) {
+          for (const [k, label] of LIMITS) {
+            const fld = el('rcs-field', { label, kind: 'number', 'data-k': k });
+            fld.addEventListener('change', (e) => rcs.send({ type: 'thresholds', values: { [k]: Number(e.detail) } }));
+            lim.append(fld);
+          }
+        }
+        for (const fld of lim.children) if (!fld.hasAttribute('editing')) fld.setAttribute('value', String(s.thresholds[fld.dataset.k]));
+      }
+
+      $('emptySetup').onclick = () => rcs.send({ type: 'view', view: 'setup' });
+      $('scan').onclick = () => rcs.send({ type: 'scan' });
+      $('address').addEventListener('change', (e) => {
+        if (e.detail) rcs.send({ type: 'add', kind: $('kind').value, host: e.detail });
+        $('address').setAttribute('value', '');
+      });
+      $('allowControls').addEventListener('change', (e) =>
+        e.detail
+          ? ask('Allow commands to the processors? Presets, brightness, freeze and blackout keys then send to the selected processor after a second press.', 'Allow', 'danger', () => rcs.send({ type: 'allow', on: true }))
+          : rcs.send({ type: 'allow', on: false })
+      );
+      $('no').addEventListener('click', () => s && ($('allowControls').checked = s.allowControls));
+
+      await rcs.ready();
+      rcs.on('message', (m) => {
+        if (m?.type === 'snapshot') {
+          s = m;
+          draw();
+        }
+      });
+      rcs.send({ type: 'hello' });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "processors": [],
+  "thresholds": { "tempWarnC": 70, "tempCritC": 80, "fanMinRpm": 500, "tileTempWarnC": 65, "tileTempCritC": 75, "tilesOfflineCritPercent": 5, "unreachableAfterPolls": 3, "portLoadWarnPercent": 90 },
+  "allowControls": false
+}

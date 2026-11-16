@@ -1,0 +1,21 @@
+{
+  "id": "led-monitor",
+  "name": "LED Processor Monitor",
+  "version": "0.1.0",
+  "description": "Watch Brompton Tessera and NovaStar LED processors, with confirmed controls",
+  "icon": "assets/icon.svg",
+  "apiVersion": 1,
+  "entry": "dist/index.js",
+  "ui": "ui",
+  "configSchema": "config.schema.json",
+  "defaults": "config.defaults.json",
+  "web": {
+    "ui": "web",
+    "pages": [
+      { "id": "overview", "label": "Processors" },
+      { "id": "alerts", "label": "Alerts" },
+      { "id": "outputs", "label": "Loops & tiles" },
+      { "id": "setup", "label": "Setup" }
+    ]
+  }
+}

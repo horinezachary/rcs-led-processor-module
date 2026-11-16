@@ -1,0 +1,547 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { padding: 24px; }
+      section { display: flex; flex-direction: column; gap: 16px; max-width: 1600px; }
+      header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+      h2 { margin: 0; font-size: 22px; }
+      h3 { margin: 0; font-size: 15px; color: var(--rcs-muted); font-weight: 600; }
+      .grow { flex: 1; }
+      p, .note { margin: 0; color: var(--rcs-muted); font-size: 15px; line-height: 1.5; }
+      .card { border: 1px solid var(--rcs-border); border-radius: 14px; background: var(--rcs-surface); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+      .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .ok { --sev: var(--rcs-ok); } .warning { --sev: var(--rcs-warn); } .critical { --sev: var(--rcs-error); } .unknown, .info { --sev: var(--rcs-muted); }
+      .pill { height: 28px; padding: 0 12px; border-radius: 14px; font: 700 13px var(--rcs-font); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+        color: var(--sev); background: color-mix(in srgb, var(--sev) 12%, transparent); border: 1px solid color-mix(in srgb, var(--sev) 40%, transparent); }
+      .dot { display: inline-block; width: 9px; height: 9px; border-radius: 5px; background: var(--sev); flex: none; }
+      .badge { font: 600 12px var(--rcs-font); letter-spacing: 0.06em; padding: 3px 8px; border-radius: 6px; border: 1px solid currentColor; white-space: nowrap; }
+      input[type=text], input[type=number], select { min-height: 44px; border-radius: 10px; border: 1px solid var(--rcs-border); background: var(--rcs-bg); color: var(--rcs-text);
+        padding: 0 12px; font: 16px var(--rcs-font); min-width: 0; box-sizing: border-box; }
+      input:focus, select:focus { outline: 2px solid var(--rcs-accent); border-color: transparent; }
+      label.f { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--rcs-muted); }
+      table { width: 100%; border-collapse: collapse; }
+      th { text-align: left; font-size: 13px; font-weight: 600; color: var(--rcs-muted); padding: 8px; border-bottom: 1px solid var(--rcs-border); white-space: nowrap; }
+      td { padding: 7px 8px; border-bottom: 1px solid var(--rcs-border); font-size: 15px; vertical-align: middle; }
+      td.mono { font-family: var(--rcs-mono); color: var(--rcs-muted); white-space: nowrap; }
+      td.fit { width: 1%; white-space: nowrap; }
+      .scrollx { overflow-x: auto; }
+
+      .procs { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+      .proc { cursor: pointer; text-align: left; font: inherit; color: var(--rcs-text); }
+      .proc.sel { border-color: var(--rcs-accent); box-shadow: inset 0 0 0 1px var(--rcs-accent); }
+      .proc .top { display: flex; align-items: center; gap: 10px; }
+      .proc .n { font-size: 19px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .proc dl, .detail dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: 14px; }
+      .proc dt, .detail dt { color: var(--rcs-muted); }
+      .proc dd, .detail dd { margin: 0; font-family: var(--rcs-mono); overflow-wrap: anywhere; }
+      .alert { font-size: 14px; color: var(--sev); display: flex; gap: 8px; align-items: center; }
+      svg.spark { width: 100%; height: 60px; display: block; }
+      .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+      .bright { display: flex; gap: 10px; align-items: center; }
+      .bright input[type=range] { flex: 1; accent-color: var(--rcs-accent); min-height: 44px; }
+      .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+      .tiles { display: flex; gap: 2px; flex-wrap: wrap; }
+      .tiles i { width: 14px; height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--sev) 70%, transparent); }
+      .bar { height: 10px; border-radius: 5px; background: var(--rcs-bg); border: 1px solid var(--rcs-border); overflow: hidden; min-width: 120px; }
+      .bar b { display: block; height: 100%; background: var(--sev); }
+      .loops { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+      .loop { border: 1px solid var(--rcs-border); border-radius: 10px; padding: 8px 12px; background: var(--rcs-bg); font: 600 15px var(--rcs-mono); }
+      .loop small { display: block; font: 700 11px var(--rcs-font); letter-spacing: 0.06em; color: var(--sev); }
+      .limits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+      .setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; align-items: start; }
+      .toggle { display: flex; align-items: center; gap: 14px; font-size: 16px; }
+    </style>
+  </head>
+  <body>
+    <!-- The web view's pages. The processor shown here belongs to this browser: choosing one never
+         moves the panel. Every command asks for confirmation first, naming the processor. -->
+    <section id="page-overview">
+      <header><span class="pill" id="overall"><span class="dot"></span><span id="overallText"></span></span><span class="note" id="sub"></span></header>
+      <p id="ovNote" hidden></p>
+      <div class="procs" id="procs"></div>
+      <div class="card" id="detail" hidden></div>
+    </section>
+
+    <section id="page-alerts" hidden>
+      <div class="card"><h3 id="alertsHead">Active alerts</h3><div class="scrollx"><table id="alertTable"></table></div></div>
+      <div class="card">
+        <div class="row"><h3 class="grow">Event log (since the module started)</h3>
+          <select id="evProc" aria-label="Processor"></select>
+          <select id="evLevel" aria-label="Level"><option value="">All levels</option><option value="critical">Critical</option><option value="warning">Warning and worse</option><option value="control">Commands</option></select>
+        </div>
+        <div class="scrollx"><table id="eventTable"></table></div>
+      </div>
+    </section>
+
+    <section id="page-outputs" hidden>
+      <header><span class="note">The processor shown here belongs to this browser.</span><div class="grow"></div><select id="outProc" aria-label="Processor"></select></header>
+      <div id="outBody" class="two"></div>
+    </section>
+
+    <section id="page-setup" hidden>
+      <div class="setup">
+        <div class="card">
+          <h3>Add a processor</h3>
+          <label class="f">Kind<select id="kind"><option value="brompton">Brompton Tessera (HTTP, port 80)</option><option value="coex">NovaStar COEX (HTTP, port 8001)</option><option value="vxpro">NovaStar VX Pro (COEX API, else TCP 15200)</option><option value="device">Other device (answers on a port)</option></select></label>
+          <label class="f">IP address or host name<input type="text" id="host" placeholder="10.10.20.11" /></label>
+          <div class="row"><label class="f" style="flex: 1">Port (empty: the usual one)<input type="number" id="port" min="1" max="65535" /></label><label class="f" style="flex: 2">Name (empty: the processor's own)<input type="text" id="label" maxlength="40" /></label></div>
+          <div class="row"><rcs-button id="add" variant="primary">Add</rcs-button></div>
+          <h3>Scan the network</h3>
+          <p>Asks every address on a /24 network the read-only questions Tessera and COEX answer about themselves. Nothing is written to any device.</p>
+          <div class="row"><input type="text" id="subnet" placeholder="the unit's own networks, or e.g. 10.10.20" style="flex: 1" /><rcs-button id="scan">Scan</rcs-button></div>
+          <div class="scrollx"><table id="foundTable"></table></div>
+        </div>
+        <div class="card">
+          <h3>Controls</h3>
+          <label class="toggle"><rcs-toggle id="allowControls" label="Allow controls"></rcs-toggle>Allow controls</label>
+          <p>Off: the module only reads. On: the panel keys and this page can load presets, set brightness, freeze, black out, switch inputs, request failover and reboot, each after a confirmation. Commands have only been tried against the simulators.</p>
+          <h3>Alert limits</h3>
+          <div class="limits" id="limits"></div>
+          <div class="row"><rcs-button id="saveLimits" variant="primary">Save limits</rcs-button></div>
+        </div>
+      </div>
+      <div class="card"><h3 id="listHead">Processors</h3><div class="scrollx"><table id="procTable"></table></div></div>
+    </section>
+
+    <rcs-dialog id="confirm">
+      <span id="confirmText"></span>
+      <div slot="buttons">
+        <rcs-button id="no">Cancel</rcs-button>
+        <rcs-button id="yes" variant="primary">OK</rcs-button>
+      </div>
+    </rcs-dialog>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const PAGES = ['overview', 'alerts', 'outputs', 'setup'];
+      const SEV = { ok: 'OK', warning: 'Warning', critical: 'Critical', unknown: 'Unknown' };
+      const KIND = { brompton: 'Brompton Tessera', coex: 'NovaStar COEX', vxpro: 'NovaStar VX Pro', device: 'Device' };
+      const LIMITS = [
+        ['tempWarnC', 'Processor warning, °C'], ['tempCritC', 'Processor critical, °C'],
+        ['tileTempWarnC', 'Tile warning, °C'], ['tileTempCritC', 'Tile critical, °C'],
+        ['fanMinRpm', 'Fan minimum, RPM (0: off)'], ['portLoadWarnPercent', 'Port load warning, %'],
+        ['tilesOfflineCritPercent', 'Tiles offline for critical, %'], ['unreachableAfterPolls', 'Missed polls before critical']
+      ];
+      let s = null;
+      let page = 'overview';
+      let mine = ''; // this browser's processor
+      let out = null; // detail from get-processor
+      let onYes = null;
+
+      function el(tag, attrs = {}, text) {
+        const e = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          if (v === true) e.setAttribute(k, '');
+          else if (v !== false && v != null) e.setAttribute(k, String(v));
+        }
+        if (text != null) e.textContent = text;
+        return e;
+      }
+      const button = (text, variant, fn, disabled) => {
+        const b = el('rcs-button', { size: 'small', variant, disabled: !!disabled }, text);
+        b.addEventListener('click', (e) => { e.stopPropagation(); if (!disabled) fn(); });
+        return b;
+      };
+      function ask(text, ok, variant, fn) {
+        $('confirmText').textContent = text;
+        $('yes').textContent = ok;
+        $('yes').setAttribute('variant', variant);
+        onYes = fn;
+        $('confirm').show();
+      }
+      $('no').onclick = () => { $('confirm').close(); if (s) $('allowControls').checked = s.allowControls; };
+      $('yes').onclick = () => { $('confirm').close(); onYes?.(); };
+      const tr = (attrs, ...cells) => { const r = el('tr', attrs); r.append(...cells); return r; };
+      const fmt = (n) => Number(n).toLocaleString('en-US');
+      const when = (t) => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+      const proc = (id) => s?.processors.find((p) => p.id === id);
+      const control = (p, action, value, text, variant = 'danger') =>
+        ask(`${text} on ${p.name} (${p.host})?`, 'Send', variant, () => rcs.send({ type: 'control', id: p.id, action, value, from: 'web' }));
+
+      function show(p) {
+        page = PAGES.includes(p) ? p : 'overview';
+        for (const x of PAGES) $('page-' + x).hidden = x !== page;
+        if (page === 'outputs') want();
+        draw();
+      }
+
+      function want() {
+        if (!s) return;
+        if (!proc(mine)) mine = s.current || s.processors[0]?.id || '';
+        if (mine) rcs.send({ type: 'get-processor', id: mine });
+      }
+
+      function draw() {
+        if (!s) return;
+        if (!proc(mine)) mine = s.current || s.processors[0]?.id || '';
+        ({ overview: drawOverview, alerts: drawAlerts, outputs: drawOutputs, setup: drawSetup })[page]();
+      }
+
+      function spark(points, limit) {
+        const vals = points.map((p) => p[0]).filter((v) => v != null);
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'spark');
+        svg.setAttribute('viewBox', '0 0 300 60');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('role', 'img');
+        svg.setAttribute('aria-label', 'Hottest processor temperature, last minutes');
+        if (vals.length < 2) return svg;
+        const lo = Math.min(...vals, limit - 25), hi = Math.max(...vals, limit + 2);
+        const y = (v) => 56 - ((v - lo) / (hi - lo)) * 52;
+        const line = document.createElementNS(svg.namespaceURI, 'polyline');
+        line.setAttribute('points', vals.map((v, i) => `${(i / (vals.length - 1)) * 300},${y(v)}`).join(' '));
+        line.setAttribute('fill', 'none');
+        line.setAttribute('stroke', 'var(--rcs-accent)');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('vector-effect', 'non-scaling-stroke');
+        const lim = document.createElementNS(svg.namespaceURI, 'line');
+        Object.entries({ x1: 0, x2: 300, y1: y(limit), y2: y(limit), stroke: 'var(--rcs-warn)', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke' }).forEach(([k, v]) => lim.setAttribute(k, v));
+        svg.append(lim, line);
+        return svg;
+      }
+
+      function drawOverview() {
+        $('overall').className = 'pill ' + s.severity;
+        $('overallText').textContent = s.processors.length ? (s.severity === 'ok' ? 'All OK' : `${SEV[s.severity]} · ${s.alerts.length} alert${s.alerts.length === 1 ? '' : 's'}`) : 'No processors';
+        $('sub').textContent = `Polling every ${s.pollSeconds} s · ${s.allowControls ? 'controls allowed, each asks first' : 'read only (Allow controls is off in Setup)'}`;
+        $('ovNote').hidden = !!s.processors.length;
+        $('ovNote').textContent = 'No processors yet. Add them in Setup, by address or by scanning the network.';
+        const box = $('procs');
+        box.replaceChildren();
+        for (const p of s.processors) {
+          const c = el('button', { class: 'card proc ' + p.severity + (p.id === mine ? ' sel' : '') });
+          c.onclick = () => { mine = p.id; draw(); };
+          const top = el('div', { class: 'top' });
+          const pill = el('span', { class: 'pill ' + p.severity });
+          pill.append(el('span', { class: 'dot' }), p.reachable ? SEV[p.severity] : p.lastSeen ? 'Not answering' : 'Connecting');
+          top.append(el('span', { class: 'n' }, p.name), pill);
+          c.append(top, el('p', {}, `${p.model || KIND[p.kind]} · ${p.host}${p.firmware ? ' · ' + p.firmware : ''}`));
+          for (const a of p.alerts) {
+            const line = el('div', { class: 'alert ' + a.severity });
+            line.append(el('span', { class: 'dot' }), a.message);
+            c.append(line);
+          }
+          if (!p.reachable && p.lastError) c.append(el('div', { class: 'alert critical' }, p.lastError));
+          if (p.note) c.append(el('p', {}, p.note));
+          const dl = el('dl');
+          const add = (k, v) => v && dl.append(el('dt', {}, k), el('dd', {}, v));
+          add('Input', p.input);
+          add('Genlock', p.genlock);
+          add('Hottest', p.hottest && `${p.hottest.label}, ${p.hottest.value.toFixed(1)} °C`);
+          add('Hottest tile', p.tileTemp && `${p.tileTemp.hottestLabel}, ${p.tileTemp.hottest.toFixed(1)} °C (average ${p.tileTemp.average})`);
+          add('Fans', p.fans);
+          add('Tiles', p.tiles && `${fmt(p.tiles.online)} of ${fmt(p.tiles.associated)} online${p.tiles.errors ? `, ${p.tiles.errors} with errors` : ''}`);
+          add('Redundancy', p.redundancy);
+          add('Brightness', p.brightnessText);
+          add('Preset', p.preset && `${p.preset.number} ${p.preset.name}`);
+          add('Output', [p.blackout && 'BLACKOUT', p.freeze && 'FROZEN'].filter(Boolean).join(', '));
+          add('Uptime', p.uptime);
+          c.append(dl);
+          if (p.history.some((h) => h[0] != null)) c.append(spark(p.history, s.thresholds.tempWarnC));
+          box.append(c);
+        }
+        drawDetail();
+      }
+
+      function drawDetail() {
+        const d = $('detail');
+        const p = proc(mine);
+        d.hidden = !p || p.kind === 'device';
+        d.replaceChildren();
+        if (d.hidden) return;
+        const caps = p.controls || {};
+        const allow = s.allowControls && p.reachable;
+        d.append(el('h2', {}, `${p.name}: controls`));
+        if (!s.allowControls) d.append(el('p', {}, 'Allow controls is off in Setup, so this page only reads.'));
+        else if (!p.reachable) d.append(el('p', {}, 'The processor is not answering.'));
+        const grid = el('div', { class: 'controls' });
+        if (caps.brightness) {
+          const b = caps.brightness;
+          const box = el('div', { class: 'card' });
+          const r = el('input', { type: 'range', min: b.min, max: b.max, step: b.step, value: p.brightness ?? b.min, disabled: !allow, 'aria-label': 'Brightness' });
+          const v = el('span', { style: 'font: 600 15px var(--rcs-mono); min-width: 90px' }, p.brightnessText || '–');
+          r.oninput = () => (v.textContent = `${r.value}${b.unit === '%' ? '%' : ' nits'}`);
+          r.onchange = () => control(p, 'brightness', Number(r.value), `Set brightness to ${r.value}${b.unit === '%' ? '%' : ' nits'}`, 'primary');
+          const row = el('div', { class: 'bright' });
+          row.append(r, v);
+          box.append(el('h3', {}, 'Brightness'), row);
+          grid.append(box);
+        }
+        if (caps.preset && p.presets.length) {
+          const box = el('div', { class: 'card' });
+          const row = el('div', { class: 'row' });
+          for (const pr of p.presets) row.append(button(`${pr.number} ${pr.name}`, p.preset?.number === pr.number ? 'primary' : undefined, () => control(p, 'preset', pr.number, `Load preset ${pr.number} "${pr.name}"`), !allow));
+          box.append(el('h3', {}, 'Presets'), row);
+          grid.append(box);
+        }
+        if (caps.input && p.inputs.length) {
+          const box = el('div', { class: 'card' });
+          const sel = el('select', { disabled: !allow, 'aria-label': 'Input' });
+          for (const i of p.inputs) sel.append(el('option', { value: i.key, selected: i.active }, `${i.label}${i.signal ? '' : ' (no signal)'}${i.active ? ' · active' : ''}`));
+          sel.onchange = () => {
+            const i = p.inputs.find((x) => x.key === sel.value);
+            control(p, 'input', sel.value, `Switch the wall to ${i?.label ?? sel.value}${i && !i.signal ? ', which has no signal,' : ''}`);
+          };
+          box.append(el('h3', {}, 'Input'), sel);
+          grid.append(box);
+        }
+        const out = el('div', { class: 'card' });
+        const orow = el('div', { class: 'row' });
+        if (caps.blackout) orow.append(button(p.blackout ? 'Blackout off' : 'Blackout', p.blackout ? 'primary' : 'danger', () => control(p, 'blackout', !p.blackout, p.blackout ? 'Turn blackout off' : 'Black out the wall'), !allow));
+        if (caps.freeze) orow.append(button(p.freeze ? 'Unfreeze' : 'Freeze', undefined, () => control(p, 'freeze', !p.freeze, p.freeze ? 'Unfreeze the wall' : 'Freeze the wall'), !allow));
+        if (caps.failover) orow.append(button('Request failover', 'danger', () => control(p, 'failover', undefined, 'Request failover: the partner processor takes over the wall'), !allow));
+        if (caps.reboot) orow.append(button('Reboot', 'danger', () => control(p, 'reboot', undefined, 'Reboot the processor: the wall goes dark until it is back'), !allow));
+        if (caps.resetErrors) orow.append(button('Reset error counts', undefined, () => ask(`Count receiving card errors on ${p.name} from now on? Nothing is sent to the processor; its own counters keep running.`, 'Reset', 'primary', () => rcs.send({ type: 'control', id: p.id, action: 'resetErrors', from: 'web' }))));
+        if (orow.childElementCount) {
+          out.append(el('h3', {}, 'Output'), orow);
+          grid.append(out);
+        }
+        d.append(grid);
+        if (p.temperatures.length || p.fanList.length) {
+          const dl = el('dl');
+          for (const t of p.temperatures) dl.append(el('dt', {}, t.label), el('dd', {}, `${t.value.toFixed(1)} °C`));
+          for (const f of p.fanList) dl.append(el('dt', {}, f.label), el('dd', {}, f.running ? (f.rpm != null ? `${Math.round(f.rpm)} RPM` : 'running') : 'STOPPED'));
+          const box = el('div', { class: 'detail' });
+          box.append(dl);
+          d.append(el('h3', {}, 'Temperatures and fans'), box);
+        }
+      }
+
+      function procSelect(id) {
+        const sel = $(id);
+        const keep = sel.value;
+        sel.replaceChildren(...(id === 'evProc' ? [el('option', { value: '' }, 'All processors')] : []), ...s.processors.map((p) => el('option', { value: p.id }, p.name)));
+        sel.value = id === 'outProc' ? mine : keep;
+      }
+
+      function drawAlerts() {
+        $('alertsHead').textContent = `Active alerts: ${s.alerts.length}`;
+        const t = $('alertTable');
+        t.replaceChildren();
+        if (!s.alerts.length) t.append(tr({}, el('td', {}, 'Nothing needs attention.')));
+        else {
+          const h = el('tr');
+          for (const x of ['Level', 'Processor', 'Alert', 'For']) h.append(el('th', {}, x));
+          t.append(h);
+        }
+        for (const a of s.alerts) {
+          const r = el('tr', { class: a.severity });
+          const lv = el('td', { class: 'fit' });
+          const pill = el('span', { class: 'pill ' + a.severity }, SEV[a.severity]);
+          lv.append(pill);
+          r.append(lv, el('td', { class: 'fit' }, a.procName), el('td', {}, a.message), el('td', { class: 'mono fit' }, ago(a.since)));
+          t.append(r);
+        }
+        procSelect('evProc');
+        const pid = $('evProc').value;
+        const lvl = $('evLevel').value;
+        const ev = $('eventTable');
+        ev.replaceChildren();
+        const h = el('tr');
+        for (const x of ['Time', 'Level', 'Event']) h.append(el('th', {}, x));
+        ev.append(h);
+        for (const e of s.events) {
+          if (pid && e.processorId !== pid) continue;
+          if (lvl === 'critical' && e.level !== 'critical') continue;
+          if (lvl === 'warning' && !['warning', 'critical'].includes(e.level)) continue;
+          if (lvl === 'control' && e.source !== 'control') continue;
+          const r = el('tr', { class: e.level === 'info' ? 'info' : e.level });
+          r.append(el('td', { class: 'mono fit' }, when(e.time)), el('td', { class: 'fit', style: 'color: var(--sev); font-weight: 700; font-size: 13px' }, e.level.toUpperCase()), el('td', {}, e.message));
+          ev.append(r);
+        }
+      }
+      $('evProc').onchange = $('evLevel').onchange = () => drawAlerts();
+
+      function drawOutputs() {
+        procSelect('outProc');
+        const body = $('outBody');
+        body.replaceChildren();
+        const o = out?.outputs;
+        if (!o || o.id !== mine) return body.append(el('p', {}, s.processors.length ? 'Reading…' : 'No processors yet.'));
+        const main = el('div', { class: 'card', style: 'grid-column: 1 / -1' });
+        if (o.topology?.groups?.length) {
+          main.append(el('h3', {}, `Output ports${o.topology.name ? ' · ' + o.topology.name : ''}`));
+          const t = el('table');
+          const h = el('tr');
+          for (const x of ['Port', 'Cabinets', 'Load', '']) h.append(el('th', {}, x));
+          t.append(h);
+          for (const g of o.topology.groups) {
+            if (o.topology.groups.length > 1) t.append(tr({}, el('td', { colspan: 4, style: 'font-weight: 700' }, g.left.name)));
+            for (const ch of g.chains) {
+              const r = el('tr', { class: ch.severity });
+              const pn = el('td', { class: 'fit' });
+              pn.append(el('span', { class: 'dot', style: 'margin-right: 8px' }), ch.label);
+              const tiles = el('div', { class: 'tiles' });
+              for (const x of ch.tiles) tiles.append(el('i', { class: x.severity, title: `${x.label}${x.detail ? ': ' + x.detail : ''}` }));
+              const tt = el('td');
+              tt.append(tiles);
+              const ld = el('td', { class: 'fit ' + (ch.from.load?.percent > 100 ? 'critical' : ch.from.load?.percent >= s.thresholds.portLoadWarnPercent ? 'warning' : 'ok') });
+              if (ch.from.load) {
+                const bar = el('div', { class: 'bar' });
+                bar.append(el('b', { style: `width: ${Math.min(100, ch.from.load.percent)}%` }));
+                ld.append(bar, el('span', { class: 'note' }, `${Math.round(ch.from.load.percent)}% · ${fmt(ch.from.load.pixels)} px`));
+              }
+              r.append(pn, tt, ld, el('td', { class: 'note' }, ch.notes.join(' ')));
+              t.append(r);
+            }
+          }
+          main.append(t);
+          for (const n of o.topology.notes ?? []) main.append(el('p', {}, n));
+        } else if (o.loops.length) {
+          main.append(el('h3', {}, `Cable loops: ${o.loops.filter((l) => l.found).length} of ${o.loops.length} found`));
+          const g = el('div', { class: 'loops' });
+          for (const l of o.loops) {
+            const d = el('div', { class: 'loop ' + (l.found ? 'ok' : 'unknown'), title: l.state }, l.port ? `${l.port}${l.to ? ' → ' + l.to : ''}` : `Loop ${l.index}`);
+            d.append(el('small', {}, l.found ? 'LOOP FOUND' : 'NO LOOP'));
+            g.append(d);
+          }
+          main.append(g, el('p', {}, 'Tessera lists every possible loop; a loop that was found and is then lost raises an alert.'));
+        } else main.append(el('p', {}, o.kind === 'vxpro' ? 'A VX Pro on its control protocol reports no outputs or tiles.' : o.kind === 'device' ? 'This device is only checked for an answer.' : 'No loops or cabinets reported.'));
+        body.append(main);
+        if (o.tiles) {
+          const c = el('div', { class: 'card' });
+          const dl = el('dl');
+          const add = (k, v) => dl.append(el('dt', {}, k), el('dd', {}, v));
+          add('Associated', fmt(o.tiles.associated));
+          add('Online', fmt(o.tiles.online));
+          add('With errors', fmt(o.tiles.errors));
+          for (const [v, n] of Object.entries(o.tiles.firmware)) add(`Firmware ${v}`, `${fmt(n)} tiles`);
+          const box = el('div', { class: 'detail' });
+          box.append(dl);
+          c.append(el('h3', {}, 'Tiles'), box);
+          body.append(c);
+        }
+        if (o.devices.length) {
+          const c = el('div', { class: 'card' });
+          const t = el('table');
+          for (const x of o.devices) t.append(tr({}, el('td', {}, `${x.type ?? 'Device'} ${x.id}`), el('td', { class: 'mono' }, x.firmware ?? ''), el('td', {}, x.online === false ? 'offline' : 'online')));
+          c.append(el('h3', {}, 'Distribution boxes'), t);
+          body.append(c);
+        }
+        if (o.tileTemperatures.length) {
+          const c = el('div', { class: 'card' });
+          const t = el('table');
+          for (const x of [...o.tileTemperatures].sort((a, b) => b.value - a.value).slice(0, 12)) {
+            const r = el('tr', { class: x.value >= s.thresholds.tileTempCritC ? 'critical' : x.value >= s.thresholds.tileTempWarnC ? 'warning' : 'ok' });
+            r.append(el('td', {}, x.label), el('td', { class: 'fit', style: 'color: var(--sev); font-family: var(--rcs-mono)' }, `${x.value.toFixed(1)} °C`));
+            t.append(r);
+          }
+          c.append(el('h3', {}, 'Hottest tiles'), t);
+          body.append(c);
+        }
+        if (out.events?.length) {
+          const c = el('div', { class: 'card', style: 'grid-column: 1 / -1' });
+          const t = el('table');
+          for (const e of out.events.slice(0, 30)) t.append(tr({ class: e.level === 'info' ? 'info' : e.level }, el('td', { class: 'mono fit' }, when(e.time)), el('td', {}, e.message)));
+          c.append(el('h3', {}, 'Events'), t);
+          body.append(c);
+        }
+      }
+      $('outProc').onchange = () => { mine = $('outProc').value; out = null; want(); draw(); };
+
+      function drawSetup() {
+        $('allowControls').checked = s.allowControls;
+        $('scan').textContent = s.scanning ? 'Scanning…' : 'Scan';
+        $('scan').toggleAttribute('disabled', s.scanning);
+        const lim = $('limits');
+        if (!lim.childElementCount) {
+          for (const [k, label] of LIMITS) {
+            const f = el('label', { class: 'f' }, label);
+            f.append(el('input', { type: 'number', id: 'lim-' + k }));
+            lim.append(f);
+          }
+        }
+        for (const [k] of LIMITS) {
+          const i = $('lim-' + k);
+          if (document.activeElement !== i && !i.dataset.dirty) i.value = s.thresholds[k];
+        }
+        const ft = $('foundTable');
+        ft.replaceChildren();
+        const known = new Set(s.entries.map((e) => `${e.host}:${e.port}`));
+        for (const f of s.found) {
+          const r = el('tr');
+          const added = known.has(`${f.host}:${f.port}`);
+          const a = el('td', { class: 'fit' });
+          a.append(button(added ? 'Added' : 'Add', added ? undefined : 'primary', () => rcs.send({ type: 'add', kind: f.kind, host: f.host, port: f.port }), added));
+          r.append(el('td', {}, f.name || f.model || f.host), el('td', { class: 'mono' }, `${f.host}${f.port ? ':' + f.port : ''}`), el('td', {}, KIND[f.kind]), a);
+          ft.append(r);
+        }
+        $('listHead').textContent = `Processors: ${s.entries.length} of 12`;
+        const t = $('procTable');
+        t.replaceChildren();
+        const h = el('tr');
+        for (const x of ['', 'Name', 'Kind', 'Address', 'Port capacity (COEX)', '']) h.append(el('th', {}, x));
+        t.append(h);
+        s.entries.forEach((e, i) => {
+          const p = proc(e.id);
+          const r = el('tr', { class: p?.severity ?? 'unknown' });
+          const dot = el('td', { class: 'fit' });
+          dot.append(el('span', { class: 'dot' }));
+          const name = el('input', { type: 'text', value: e.label, placeholder: p?.name || 'processor name', maxlength: 40, 'aria-label': 'Name' });
+          name.onchange = () => rcs.send({ type: 'edit', id: e.id, label: name.value });
+          const nm = el('td');
+          nm.append(name);
+          const cap = el('td');
+          if (e.kind === 'coex' || e.kind === 'vxpro') {
+            const ci = el('input', { type: 'number', value: e.portCapacity || '', placeholder: 'from the processor', min: 0, 'aria-label': 'Port capacity in pixels' });
+            ci.onchange = () => rcs.send({ type: 'edit', id: e.id, portCapacity: Number(ci.value || 0) });
+            cap.append(ci);
+          }
+          const acts = el('td', { class: 'fit' });
+          const row = el('div', { class: 'row', style: 'flex-wrap: nowrap' });
+          row.append(
+            button('↑', undefined, () => rcs.send({ type: 'move', id: e.id, by: -1 }), i === 0),
+            button('↓', undefined, () => rcs.send({ type: 'move', id: e.id, by: 1 }), i === s.entries.length - 1),
+            button('Remove', 'danger', () => ask(`Remove ${p?.name || e.host} from this module? Nothing changes on the processor.`, 'Remove', 'danger', () => rcs.send({ type: 'remove', id: e.id })))
+          );
+          acts.append(row);
+          r.append(dot, nm, el('td', {}, KIND[e.kind]), el('td', { class: 'mono' }, `${e.host}${e.port ? ':' + e.port : ''}${p && !p.reachable && p.lastError ? ' · ' + p.lastError : ''}`), cap, acts);
+          t.append(r);
+        });
+      }
+
+      $('add').onclick = () => {
+        rcs.send({ type: 'add', kind: $('kind').value, host: $('host').value.trim(), port: $('port').value ? Number($('port').value) : 0, label: $('label').value });
+        $('host').value = $('port').value = $('label').value = '';
+      };
+      $('scan').onclick = () => rcs.send({ type: 'scan', subnet: $('subnet').value.trim() });
+      $('saveLimits').onclick = () => {
+        const values = {};
+        for (const [k] of LIMITS) {
+          const i = $('lim-' + k);
+          values[k] = Number(i.value);
+          delete i.dataset.dirty;
+        }
+        rcs.send({ type: 'thresholds', values });
+      };
+      $('limits').addEventListener('input', (e) => (e.target.dataset.dirty = '1'));
+      $('allowControls').addEventListener('change', (e) =>
+        e.detail
+          ? ask('Allow commands to the processors? The panel keys and this page can then load presets, change brightness, freeze, black out, switch inputs, request failover and reboot, each after a confirmation.', 'Allow', 'danger', () => rcs.send({ type: 'allow', on: true }))
+          : rcs.send({ type: 'allow', on: false })
+      );
+
+      const info = await rcs.ready();
+      rcs.on('page', show);
+      rcs.on('message', (m) => {
+        if (m?.type === 'snapshot') {
+          const first = !s;
+          s = m;
+          if (first && page === 'outputs') want();
+          draw();
+        } else if (m?.type === 'processor') {
+          if (m.id !== mine) return;
+          out = m;
+          if (page === 'outputs') drawOutputs();
+        }
+      });
+      // Keep the Loops page fresh while it is open.
+      setInterval(() => page === 'outputs' && want(), 5000);
+      show(info.page);
+      rcs.send({ type: 'hello' });
+    </script>
+  </body>
+</html>
