@@ -28,7 +28,7 @@
       td.fit { width: 1%; white-space: nowrap; }
       .scrollx { overflow-x: auto; }
 
-      .procs { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+      .procs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); gap: 16px; }
       .proc { cursor: pointer; text-align: left; font: inherit; color: var(--rcs-text); }
       .proc.sel { border-color: var(--rcs-accent); box-shadow: inset 0 0 0 1px var(--rcs-accent); }
       .proc .top { display: flex; align-items: center; gap: 10px; }
@@ -38,19 +38,19 @@
       .proc dd, .detail dd { margin: 0; font-family: var(--rcs-mono); overflow-wrap: anywhere; }
       .alert { font-size: 14px; color: var(--sev); display: flex; gap: 8px; align-items: center; }
       svg.spark { width: 100%; height: 60px; display: block; }
-      .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+      .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 16px; align-items: start; }
       .bright { display: flex; gap: 10px; align-items: center; }
       .bright input[type=range] { flex: 1; accent-color: var(--rcs-accent); min-height: 44px; }
-      .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+      .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; align-items: start; }
       .tiles { display: flex; gap: 2px; flex-wrap: wrap; }
       .tiles i { width: 14px; height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--sev) 70%, transparent); }
       .bar { height: 10px; border-radius: 5px; background: var(--rcs-bg); border: 1px solid var(--rcs-border); overflow: hidden; min-width: 120px; }
       .bar b { display: block; height: 100%; background: var(--sev); }
-      .loops { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+      .loops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px; }
       .loop { border: 1px solid var(--rcs-border); border-radius: 10px; padding: 8px 12px; background: var(--rcs-bg); font: 600 15px var(--rcs-mono); }
       .loop small { display: block; font: 700 11px var(--rcs-font); letter-spacing: 0.06em; color: var(--sev); }
-      .limits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-      .setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; align-items: start; }
+      .limits { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 12px; }
+      .setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 24px; align-items: start; }
       .toggle { display: flex; align-items: center; gap: 14px; font-size: 16px; }
 
       /* topology: the processor that normally drives the wall on top, its backup underneath, distribution boxes as
