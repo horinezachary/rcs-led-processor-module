@@ -90,6 +90,12 @@
       .topo-scroll { flex: 1; min-height: 0; overflow: auto; }
       .topo { display: grid; grid-template-rows: auto 10px minmax(0, 1fr) 10px auto; min-height: 100%; }
       .topo.single { grid-template-rows: auto 10px minmax(0, 1fr); }
+      /* A taller screen (fullPanel, 1824×1080): processor cards wrap into rows instead of scrolling across, and the
+         topology keeps its natural height instead of stretching the cables. */
+      @media (min-height: 700px) {
+        .cards { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); height: auto; align-content: start; }
+        .topo { min-height: 0; }
+      }
       .pbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; height: 30px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--rcs-border);
         background: var(--rcs-surface); color: var(--rcs-text); font: 14px var(--rcs-font); text-align: left; cursor: pointer; min-width: 0; }
       .pbar .pn { font-weight: 700; font-size: 15px; white-space: nowrap; }
