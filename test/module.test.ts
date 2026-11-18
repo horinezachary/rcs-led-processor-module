@@ -48,9 +48,9 @@ async function coex() {
 
 const entry = (id: string, kind: 'brompton' | 'coex', port: number) => ({ id, kind, host: '127.0.0.1', port, label: '', portCapacity: 0 });
 
-async function start(processors: Config['processors'], extra: { allow?: boolean; state?: State; reason?: 'boot' | 'restore' | 'user' } = {}) {
+async function start(processors: Config['processors'], extra: { allow?: boolean; state?: State; reason?: 'boot' | 'restore' | 'user'; deck?: { columns: number; rows: number } } = {}) {
   const config: Config = { processors, thresholds: DEFAULT_THRESHOLDS, walls: [], allowControls: extra.allow ?? false };
-  sim = await startTestModule(mod, { config, state: extra.state, reason: extra.reason });
+  sim = await startTestModule(mod, { config, state: extra.state, reason: extra.reason, deck: extra.deck });
   await sim.settle();
   await until(() => last()?.processors?.length === processors.length && last().processors.every((p: any) => p.reachable), 5000, 'for the processors');
   await sim.settle();
@@ -270,5 +270,36 @@ describe('panel navigation', () => {
     expect(last().view).toBe('alerts');
     await sim!.tapStrip('loops');
     expect(last().outputs).toMatchObject({ id: '00000005', loops: expect.any(Array) });
+  });
+});
+
+describe('a larger Stream Deck', () => {
+  it('spreads processors, presets and commands over an XL, and goes back to 15 keys on a smaller deck', async () => {
+    const list = [];
+    for (let i = 0; i < 8; i++) {
+      const { port } = await tessera(`Wall ${i + 1}`);
+      list.push(entry(`0000000${i + 1}`, 'brompton', port));
+    }
+    await start(list, { allow: true, deck: { columns: 8, rows: 4 } });
+    expect(sim!.keys).toHaveLength(32);
+    // Row 0: six processors and a page key, then Alerts.
+    expect(sim!.keys[0]).toMatchObject({ label: 'WALL 1' });
+    expect(sim!.keys[6]).toMatchObject({ label: 'MORE ▶', sublabel: '1 of 2' });
+    expect(sim!.keys[7]).toMatchObject({ label: 'ALERTS' });
+    // Presets fill row 1 up to the brightness keys and all of row 2.
+    expect(sim!.keys[8]).toMatchObject({ sublabel: 'PRESET 1' });
+    expect(sim!.keys[14]?.label).toMatch(/^−/);
+    expect(sim!.keys[15]?.label).toMatch(/^\+/);
+    // Bottom row: freeze first, blackout last.
+    expect(sim!.keys[24]).toMatchObject({ label: 'FREEZE' });
+    expect(sim!.keys[31]).toMatchObject({ label: 'BLACKOUT' });
+    await sim!.press(5);
+    expect(sim!.state.proc).toBe('00000006');
+
+    await sim!.setDeck(5, 3);
+    await sim!.settle();
+    expect(sim!.keys).toHaveLength(15);
+    expect(sim!.keys[KEY.BLACKOUT]).toMatchObject({ label: 'BLACKOUT' });
+    expect(sim!.keys[KEY.ALERTS]).toMatchObject({ label: 'ALERTS' });
   });
 });

@@ -20,6 +20,9 @@
 //   key 11     freeze on / off
 //   key 15     blackout on / off
 //   Every command key needs a second press within 3 s.
+// A larger deck (XL 8×4, Stream Deck + XL 9×4) keeps the same shape (see layout()): the top row is
+// processors then ALERTS, the second row presets then − and +, any rows in between more presets, and
+// the bottom row FREEZE, PRESETS ▶ and, on its last key, BLACKOUT.
 
 import { randomBytes } from 'node:crypto';
 import { defineModule, type Ctx, type KeySetParams } from '@rcs/module-sdk';
@@ -61,7 +64,52 @@ export type View = 'overview' | 'alerts' | 'loops' | 'topology' | 'setup';
 const VIEWS: View[] = ['overview', 'alerts', 'loops', 'topology', 'setup'];
 const KINDS: ProcessorKind[] = ['brompton', 'coex', 'vxpro', 'device'];
 
+/** The keys on a 15-key deck. layout() gives them for any deck. */
 export const KEY = { PROC: [0, 1, 2, 3], ALERTS: 4, PRESET: [5, 6, 7], DIM: 8, BRIGHT: 9, FREEZE: 10, PRESET_PAGE: 12, BLACKOUT: 14 } as const;
+
+export interface Grid {
+  columns: number;
+  rows: number;
+}
+
+/**
+ * The deck's grid. Read from ctx.host, not ctx.deck: a unit runs modules with its own controller's
+ * SDK, and one before 0.21.0 has no ctx.deck and reports no columns or rows (5 × 3).
+ */
+export function grid(ctx: { host: { deck: { columns?: number; rows?: number } } }): Grid {
+  return { columns: ctx.host?.deck?.columns ?? 5, rows: ctx.host?.deck?.rows ?? 3 };
+}
+
+export interface Layout {
+  keys: number;
+  /** Processor keys; the last one pages when there are more processors. */
+  procs: number[];
+  alerts: number;
+  presets: number[];
+  dim: number;
+  bright: number;
+  freeze: number;
+  presetPage: number;
+  blackout: number;
+}
+
+/** Where everything goes on a deck. For 5 × 3 this is KEY. */
+export function layout(g: Grid): Layout {
+  const C = g.columns;
+  const bottom = (g.rows - 1) * C;
+  const range = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i);
+  return {
+    keys: C * g.rows,
+    procs: range(0, C - 1),
+    alerts: C - 1,
+    presets: [...range(C, 2 * C - 2), ...range(2 * C, bottom)],
+    dim: 2 * C - 2,
+    bright: 2 * C - 1,
+    freeze: bottom,
+    presetPage: bottom + 2,
+    blackout: bottom + C - 1
+  };
+}
 export const MAX_PROCESSORS = 12;
 /** A command key fires on a second press within this time. */
 export const CONFIRM_MS = 3000;
@@ -262,8 +310,8 @@ export function snapshot(ctx: C) {
 
 // ---- keys --------------------------------------------------------------------------------------
 
-function procPaging(n: number): { perPage: number; pages: number } {
-  const perPage = n > 4 ? 3 : 4;
+function procPaging(n: number, keys = 4): { perPage: number; pages: number } {
+  const perPage = n > keys ? keys - 1 : keys;
   return { perPage, pages: Math.max(1, Math.ceil(n / perPage)) };
 }
 
@@ -272,20 +320,21 @@ export function commandFor(ctx: C, index: number): ControlRequest | null {
   const p = current(ctx);
   if (!rt || !p?.reachable) return null;
   const caps = p.controls ?? {};
-  const presetSlot = (KEY.PRESET as readonly number[]).indexOf(index);
+  const L = layout(grid(ctx));
+  const presetSlot = L.presets.indexOf(index);
   if (presetSlot >= 0) {
-    const pr = (p.presets ?? [])[rt.presetPage * 3 + presetSlot];
+    const pr = (p.presets ?? [])[rt.presetPage * L.presets.length + presetSlot];
     return caps.preset && pr ? { action: 'preset', value: pr.number } : null;
   }
-  if ((index === KEY.DIM || index === KEY.BRIGHT) && caps.brightness) {
+  if ((index === L.dim || index === L.bright) && caps.brightness) {
     const b = caps.brightness;
     const step = b.unit === '%' ? 5 : 100;
-    const now = p.brightness ?? (index === KEY.DIM ? b.max : b.min);
-    const next = Math.min(b.max, Math.max(b.min, Math.round(now / step) * step + (index === KEY.DIM ? -step : step)));
+    const now = p.brightness ?? (index === L.dim ? b.max : b.min);
+    const next = Math.min(b.max, Math.max(b.min, Math.round(now / step) * step + (index === L.dim ? -step : step)));
     return next === p.brightness ? null : { action: 'brightness', value: next };
   }
-  if (index === KEY.FREEZE && caps.freeze) return { action: 'freeze', value: !p.freeze };
-  if (index === KEY.BLACKOUT && caps.blackout) return { action: 'blackout', value: !p.blackout };
+  if (index === L.freeze && caps.freeze) return { action: 'freeze', value: !p.freeze };
+  if (index === L.blackout && caps.blackout) return { action: 'blackout', value: !p.blackout };
   return null;
 }
 
@@ -293,14 +342,16 @@ function keyFaces(ctx: C): KeySetParams[] {
   const c = cfg(ctx);
   const list = views();
   const cur = current(ctx);
-  const faces: KeySetParams[] = [];
   const blank = (index: number): KeySetParams => ({ index });
+  const L = layout(grid(ctx));
+  // Every key starts blank; the ones below are drawn over it. setMany applies them in order.
+  const faces: KeySetParams[] = Array.from({ length: L.keys }, (_, k) => blank(k));
 
   // Processors
-  const { perPage, pages } = procPaging(list.length);
+  const { perPage, pages } = procPaging(list.length, L.procs.length);
   const page = Math.min(rt?.procPage ?? 0, pages - 1);
-  for (let k = 0; k < 4; k++) {
-    if (k === 3 && pages > 1) {
+  for (const k of L.procs) {
+    if (k === L.procs.length - 1 && pages > 1) {
       faces.push({ index: k, label: 'MORE ▶', sublabel: `${page + 1} of ${pages}` });
       continue;
     }
@@ -314,12 +365,9 @@ function keyFaces(ctx: C): KeySetParams[] {
     faces.push({ index: k, label: short(p.name.toUpperCase(), 10), sublabel: p.reachable ? SEV_TEXT[p.severity] : 'OFFLINE', ...(bg ? { background: bg } : {}), ...(sel ? { color: ON_ACCENT } : {}) });
   }
   const n = activeAlerts().length;
-  faces.push({ index: KEY.ALERTS, label: 'ALERTS', sublabel: n ? `${n} active` : 'none', ...(n ? { background: ACCENT, color: ON_ACCENT } : {}) });
+  faces.push({ index: L.alerts, label: 'ALERTS', sublabel: n ? `${n} active` : 'none', ...(n ? { background: ACCENT, color: ON_ACCENT } : {}) });
 
-  if (!cur) {
-    for (let k = 5; k < 15; k++) faces.push(blank(k));
-    return faces;
-  }
+  if (!cur) return faces;
   const allow = c.allowControls;
   const armed = rt?.armed && rt.armed.proc === cur.id ? rt.armed.key : -1;
   const offline = !cur.reachable;
@@ -331,9 +379,10 @@ function keyFaces(ctx: C): KeySetParams[] {
 
   // Presets
   const presets = cur.presets ?? [];
-  const pp = Math.min(rt?.presetPage ?? 0, Math.max(0, Math.ceil(presets.length / 3) - 1));
-  (KEY.PRESET as readonly number[]).forEach((index, slot) => {
-    const pr = presets[pp * 3 + slot];
+  const per = L.presets.length;
+  const pp = Math.min(rt?.presetPage ?? 0, Math.max(0, Math.ceil(presets.length / per) - 1));
+  L.presets.forEach((index, slot) => {
+    const pr = presets[pp * per + slot];
     if (!pr || !cur.controls?.preset) return faces.push(blank(index));
     faces.push(cmd(index, short(pr.name.toUpperCase(), 8), `PRESET ${pr.number}`, cur.preset?.number === pr.number));
   });
@@ -342,27 +391,22 @@ function keyFaces(ctx: C): KeySetParams[] {
   const b = cur.controls?.brightness;
   if (b) {
     const step = b.unit === '%' ? '5%' : '100';
-    faces.push(cmd(KEY.DIM, `− ${step}`, brightnessText(cur) || 'BRIGHTNESS'));
-    faces.push(cmd(KEY.BRIGHT, `+ ${step}`, brightnessText(cur) || 'BRIGHTNESS'));
-  } else faces.push(blank(KEY.DIM), blank(KEY.BRIGHT));
+    faces.push(cmd(L.dim, `− ${step}`, brightnessText(cur) || 'BRIGHTNESS'));
+    faces.push(cmd(L.bright, `+ ${step}`, brightnessText(cur) || 'BRIGHTNESS'));
+  }
 
   // Freeze
-  faces.push(cur.controls?.freeze ? cmd(KEY.FREEZE, 'FREEZE', cur.freeze ? 'ON' : 'OFF', !!cur.freeze, BLUE, '#0B1220') : blank(KEY.FREEZE));
-  faces.push(blank(11));
-  faces.push(presets.length > 3 && cur.controls?.preset ? { index: KEY.PRESET_PAGE, label: 'PRESETS ▶', sublabel: `${pp + 1} of ${Math.ceil(presets.length / 3)}` } : blank(KEY.PRESET_PAGE));
-  faces.push(blank(13));
+  if (cur.controls?.freeze) faces.push(cmd(L.freeze, 'FREEZE', cur.freeze ? 'ON' : 'OFF', !!cur.freeze, BLUE, '#0B1220'));
+  if (presets.length > per && cur.controls?.preset) faces.push({ index: L.presetPage, label: 'PRESETS ▶', sublabel: `${pp + 1} of ${Math.ceil(presets.length / per)}` });
 
   // Blackout
-  if (cur.controls?.blackout) {
-    const f = cmd(KEY.BLACKOUT, 'BLACKOUT', cur.blackout ? 'ON' : short(cur.name.toUpperCase(), 12), !!cur.blackout, RED, '#141414');
-    faces.push(f);
-  } else faces.push(blank(KEY.BLACKOUT));
+  if (cur.controls?.blackout) faces.push(cmd(L.blackout, 'BLACKOUT', cur.blackout ? 'ON' : short(cur.name.toUpperCase(), 12), !!cur.blackout, RED, '#141414'));
 
   // Without Allow controls the keys show the readings and send nothing.
   if (!allow) {
     for (const f of faces) {
-      if (f.index < 5 || f.index === KEY.PRESET_PAGE) continue;
-      if (f.label) Object.assign(f, f.index === KEY.BLACKOUT ? { label: 'VIEW ONLY', sublabel: 'see Setup' } : {}, { background: undefined, color: undefined });
+      if (f.index <= L.alerts || f.index === L.presetPage) continue;
+      if (f.label) Object.assign(f, f.index === L.blackout ? { label: 'VIEW ONLY', sublabel: 'see Setup' } : {}, { background: undefined, color: undefined });
     }
   }
   return faces.map((f) => Object.fromEntries(Object.entries(f).filter(([, v]) => v !== undefined)) as KeySetParams);
@@ -722,9 +766,10 @@ export default defineModule<State, Config>({
   async key(ctx, { index, action }) {
     if (action !== 'down' || !rt) return;
     const list = views();
-    if (index < 4) {
-      const { perPage, pages } = procPaging(list.length);
-      if (index === 3 && pages > 1) {
+    const L = layout(grid(ctx));
+    if (index < L.procs.length) {
+      const { perPage, pages } = procPaging(list.length, L.procs.length);
+      if (index === L.procs.length - 1 && pages > 1) {
         rt.procPage = (rt.procPage + 1) % pages;
         return draw(ctx);
       }
@@ -732,12 +777,13 @@ export default defineModule<State, Config>({
       if (p) await selectProcessor(ctx, p.id);
       return;
     }
-    if (index === KEY.ALERTS) return setView(ctx, 'alerts');
-    if (index === KEY.PRESET_PAGE) {
+    if (index === L.alerts) return setView(ctx, 'alerts');
+    if (index === L.presetPage) {
       const n = current(ctx)?.presets?.length ?? 0;
-      if (n > 3) {
+      const per = L.presets.length;
+      if (n > per) {
         disarm();
-        rt.presetPage = (rt.presetPage + 1) % Math.ceil(n / 3);
+        rt.presetPage = (rt.presetPage + 1) % Math.ceil(n / per);
         await draw(ctx);
       }
       return;
@@ -747,6 +793,16 @@ export default defineModule<State, Config>({
 
   async strip(ctx, id) {
     await setView(ctx, id);
+  },
+
+  fullDeck: true,
+
+  // Another deck was plugged in: the keys move, and an armed key would now be another key.
+  async deck(ctx) {
+    disarm();
+    if (rt) rt.procPage = rt.presetPage = 0;
+    await ctx.keys.clear();
+    await draw(ctx);
   },
 
   async client(ctx, { clientId, action }) {
