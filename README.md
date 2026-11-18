@@ -49,6 +49,11 @@ a single-processor wall.
 | 11 | Freeze on / off |
 | 15 | Blackout on / off |
 
+On a larger deck (an XL, 8×4, or a Stream Deck + XL, 9×4) the top row holds more processors with Alerts on
+its last key, presets fill the rest of the second row and every row down to the bottom, Brightness down / up
+sit at the end of the second row, and the bottom row starts with Freeze and ends with Blackout. This needs
+controller 0.21.0 or later; older controllers show the 15-key layout.
+
 Every command key needs a **second press within 3 seconds**: the first press only arms it (the key reads
 PRESS AGAIN and the screen names the command). Any other key disarms it.
 
