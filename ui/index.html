@@ -90,11 +90,47 @@
       .topo-scroll { flex: 1; min-height: 0; overflow: auto; }
       .topo { display: grid; grid-template-rows: auto 10px minmax(0, 1fr) 10px auto; min-height: 100%; }
       .topo.single { grid-template-rows: auto 10px minmax(0, 1fr); }
-      /* A taller screen (fullPanel, 1824×1080): processor cards wrap into rows instead of scrolling across, and the
-         topology keeps its natural height instead of stretching the cables. */
+      /* A taller screen (fullPanel, 1824×1080). The 440 px bar never matches this, so it keeps the layout above.
+         Processor cards take the full height (one row up to four, two rows beyond) with every reading, the
+         alerts in full and recent events. Topology stacks every wall and shows details only for a selection. */
+      .tall-only { display: none; }
       @media (min-height: 700px) {
-        .cards { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); height: auto; align-content: start; }
+        .cards { grid-auto-flow: row; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr)); grid-auto-columns: auto; height: 100%; gap: 16px; }
+        .card { padding: 16px 20px; gap: 10px; }
+        .card .n { font-size: 24px; }
+        .card .m { font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
+        .card .top { align-items: flex-start; flex-wrap: wrap; }
+        .alerts span { white-space: normal; font-size: 15px; }
+        .facts { grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 10px 18px; }
+        .facts .v { white-space: normal; overflow-wrap: anywhere; font-size: 16px; }
+        .badges { margin-top: 0; }
+        .sect { display: flex; flex-direction: column; gap: 4px; }
+        .meter { display: grid; grid-template-columns: minmax(0, 1fr) 120px 96px; gap: 12px; align-items: center; font-size: 14px; }
+        .meter .ml { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .meter .mv { font: 600 14px var(--rcs-mono); text-align: right; white-space: nowrap; color: var(--sev); }
+        .meter .bar { height: 8px; }
+        .chainsum { display: flex; flex-wrap: wrap; gap: 5px; }
+        .chainsum span { font: 12px var(--rcs-mono); padding: 2px 7px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--sev) 45%, var(--rcs-border)); color: var(--rcs-text); white-space: nowrap; }
+        .card .ev { grid-template-columns: 70px 1fr; font-size: 13px; padding: 3px 0; }
+        .card .ev:last-child { border-bottom: 0; }
+        .card .ev .msg { color: var(--sev); }
+        .card .ev.info .msg, .card .ev.ok .msg { color: var(--rcs-text); }
+        .card .more { color: var(--rcs-muted); font-size: 14px; }
+
         .topo { min-height: 0; }
+        .topo-view.all { grid-template-columns: minmax(0, 1fr); }
+        .topo-view.all.picked { grid-template-columns: minmax(0, 1fr) 400px; }
+        .topo-view.all .side.none { display: none; }
+        .walls { min-height: 0; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+        .walls .wall { flex: none; }
+        .walls .topo-scroll { overflow: hidden; }
+        .walls .lane, .walls .port { height: var(--lane, 18px); }
+        .walls .lane .ts i { height: calc(var(--lane, 18px) - 6px); width: calc(var(--lane, 18px) * 0.62); }
+        .walls .lane .cnt { font: 12px var(--rcs-mono); color: var(--rcs-muted); margin: 0 6px; flex: none; }
+        .walls .port { font-size: 13px; }
+        .walls .legend { margin-top: 0; }
+        .topo-view.all .side .legend { display: none; }
+        .tall-only { display: flex; }
       }
       .pbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; height: 30px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--rcs-border);
         background: var(--rcs-surface); color: var(--rcs-text); font: 14px var(--rcs-font); text-align: left; cursor: pointer; min-width: 0; }
@@ -296,7 +332,7 @@
         box.replaceChildren();
         if (s.view === 'topology') {
           // On the Topology view the tabs choose the wall, on this screen only.
-          box.hidden = s.walls.length < 2;
+          box.hidden = s.walls.length < 2 || $('wall').classList.contains('walls');
           for (const w of s.walls) {
             const b = el('button', { 'aria-pressed': w.id === wall()?.id, class: w.severity });
             b.append(el('span', { class: 'dot' }), w.name);
@@ -320,10 +356,28 @@
         return d;
       }
 
+      const tallQuery = matchMedia('(min-height: 700px)');
+      const isTall = () => tallQuery.matches;
+      tallQuery.addEventListener('change', () => draw());
+      addEventListener('resize', () => draw());
+      const RANK = { critical: 0, warning: 1, unknown: 2, ok: 3 };
+
       function drawOverview() {
         const box = $('cards');
         box.replaceChildren();
-        for (const p of s.processors) {
+        const tall = isTall();
+        let list = s.processors;
+        if (tall) {
+          // One row up to four processors, two rows beyond. The panel does not scroll: processors with alerts
+          // come first so they are never the cards left out.
+          list = list.map((p, i) => [p, i]).sort((a, b) => (a[0].alerts.length ? 0 : 1) - (b[0].alerts.length ? 0 : 1) || RANK[a[0].severity] - RANK[b[0].severity] || a[1] - b[1]).map(([p]) => p);
+          const cols = Math.min(4, Math.max(1, list.length <= 4 ? list.length : Math.ceil(list.length / 2)));
+          const rows = list.length <= 4 ? 1 : 2;
+          box.style.setProperty('--cols', String(cols));
+          box.style.setProperty('--rows', String(rows));
+          if (list.length > cols * rows) list = list.slice(0, cols * rows - 1);
+        }
+        for (const p of list) {
           const c = el('button', { class: 'card ' + p.severity + (p.id === s.current ? ' sel' : '') });
           c.onclick = () => rcs.send({ type: 'select', id: p.id });
           const top = el('div', { class: 'top' });
@@ -333,12 +387,12 @@
           top.append(pill);
           c.append(top);
           const al = el('div', { class: 'alerts' });
-          for (const a of p.alerts.slice(0, 2)) {
+          for (const a of p.alerts.slice(0, tall ? 8 : 2)) {
             const line = el('span', { class: a.severity });
             line.append(el('span', { class: 'dot' }), a.message);
             al.append(line);
           }
-          if (p.alerts.length > 2) al.append(el('span', { class: 'none' }, `and ${p.alerts.length - 2} more`));
+          if (p.alerts.length > (tall ? 8 : 2)) al.append(el('span', { class: 'none' }, `and ${p.alerts.length - (tall ? 8 : 2)} more`));
           if (!p.alerts.length) al.append(el('span', { class: 'none' }, p.reachable ? 'No alerts' : p.lastError || 'Waiting for the first answer'));
           c.append(al);
           if (p.note) c.append(el('div', { class: 'why' }, p.note));
@@ -362,7 +416,74 @@
           if (p.preset) b.append(el('span', { class: 'badge pre' }, `PRESET ${p.preset.number}${p.preset.name ? ' · ' + p.preset.name.toUpperCase() : ''}`));
           if (p.tileTemp && p.redundancy) b.append(el('span', { class: 'badge ro' }, p.redundancy.toUpperCase()));
           c.append(b);
+          if (tall) tallSections(c, p);
           box.append(c);
+        }
+        if (tall && s.processors.length > list.length) {
+          const more = el('div', { class: 'card unknown', style: 'align-items: center; justify-content: center; cursor: default' });
+          more.append(el('span', { class: 'more' }, `+${s.processors.length - list.length} more processors, all listed in the web view`));
+          box.append(more);
+        }
+        // A card that runs out of room drops its least useful sections first, never the alerts.
+        if (tall) for (const c of box.children) for (const k of ['events', 'chains', 'fans', 'temps']) if (c.scrollHeight > c.clientHeight + 1) c.querySelector(`.sect.${k}`)?.remove();
+      }
+
+      // On a tall screen: every temperature and fan against its limit, the chains it drives, and its last events.
+      function tallSections(c, p) {
+        const t = s.thresholds;
+        const sect = (cls, label) => {
+          const d = el('div', { class: 'sect ' + cls });
+          d.append(el('span', { class: 'label' }, label));
+          c.append(d);
+          return d;
+        };
+        const meter = (label, value, frac, sev) => {
+          const r = el('div', { class: 'meter ' + sev });
+          const bar = el('div', { class: 'bar' });
+          bar.append(el('b', { style: `width: ${Math.max(2, Math.min(100, frac * 100)).toFixed(1)}%` }));
+          r.append(el('span', { class: 'ml' }, label), bar, el('span', { class: 'mv' }, value));
+          return r;
+        };
+        if (p.temperatures?.length) {
+          const d = sect('temps', `TEMPERATURES · WARN ${t.tempWarnC} °C · CRIT ${t.tempCritC} °C`);
+          for (const r of p.temperatures) {
+            const sev = r.value >= t.tempCritC ? 'critical' : r.value >= t.tempWarnC ? 'warning' : 'ok';
+            d.append(meter(r.label, `${r.value.toFixed(1)} °C`, r.value / t.tempCritC, sev));
+          }
+        }
+        if (p.fanList?.length) {
+          const d = sect('fans', `FANS · MIN ${fmt(t.fanMinRpm)} RPM`);
+          const top = Math.max(t.fanMinRpm * 4, ...p.fanList.map((f) => f.rpm ?? 0));
+          for (const f of p.fanList) {
+            const sev = !f.running || (f.rpm != null && f.rpm < t.fanMinRpm) ? 'critical' : 'ok';
+            d.append(meter(f.label, f.rpm != null ? `${fmt(Math.round(f.rpm))} rpm` : f.running ? 'running' : 'stopped', f.rpm != null ? f.rpm / top : f.running ? 1 : 0, sev));
+          }
+        }
+        // The chains of the walls it drives: tiles per chain from a saved layout, or port load on COEX.
+        const chains = [];
+        for (const w of s.walls) {
+          if (w.primary?.id !== p.id && w.backup?.id !== p.id) continue;
+          for (const g of w.groups) for (const ch of g.chains) chains.push({ ch, w });
+        }
+        if (chains.length) {
+          const loads = chains.some(({ ch }) => ch.from.load);
+          const tiles = chains.reduce((n, { ch }) => n + ch.tileCount, 0);
+          const d = sect('chains', loads ? 'OUTPUT PORTS · LOAD' : tiles ? `TILE CHAINS · ${fmt(tiles)} TILES` : `TILE CHAINS · ${chains.length} FROM CABLE LOOPS`);
+          const box = el('div', { class: 'chainsum' });
+          for (const { ch } of chains) {
+            const pct = ch.from.load?.percent;
+            const sev = ch.severity === 'ok' && pct != null ? (pct > 100 ? 'critical' : pct >= t.portLoadWarnPercent ? 'warning' : 'ok') : ch.severity;
+            box.append(el('span', { class: sev }, pct != null ? `${ch.label} ${Math.round(pct)}%` : ch.tileCount ? `${ch.label} · ${ch.tileCount}` : ch.label));
+          }
+          d.append(box);
+        }
+        const evs = s.events.filter((e) => e.processorId === p.id).slice(0, 6);
+        const d = sect('events', 'RECENT EVENTS');
+        if (!evs.length) d.append(el('span', { class: 'more' }, 'Nothing logged yet'));
+        for (const e of evs) {
+          const r = el('div', { class: 'ev ' + e.level });
+          r.append(el('span', { class: 't' }, clock(e.time)), el('span', { class: 'msg', title: e.message }, e.message));
+          d.append(r);
         }
       }
 
@@ -474,17 +595,71 @@
       function drawTopology() {
         const host = $('wall');
         host.replaceChildren();
+        host.className = 'wall';
+        $('view-topology').className = 'topo-view';
+        $('topoSide').className = 'box side';
         const w = wall();
         if (!w) {
           host.append(el('p', { class: 'note', style: 'white-space: normal; font-size: 16px' }, 'No walls to draw yet. Brompton walls are drawn from each processor\'s cable loops, and COEX walls from the processor\'s own cabinet map. A VX Pro reports neither.'));
           drawTopoSide(null);
           return;
         }
+        if (isTall() && drawAllWalls()) return;
+        host.append(...wallParts(w));
+        drawTopoSide(w);
+      }
+
+      // On a tall screen every wall is drawn, stacked, with chain lanes as tall as fit (and the tile count on
+      // each). The details panel shows only while something is picked, so the walls get the width otherwise.
+      // Returns false when the walls do not fit even at the 440 lane height: then one wall shows, as on the bar.
+      function drawAllWalls() {
+        const host = $('wall');
+        const view = $('view-topology');
+        const picked = !!(pick && s.walls.find((w) => w.id === pick.wall) && pickDetail(s.walls.find((w) => w.id === pick.wall)));
+        view.className = 'topo-view all' + (picked ? ' picked' : '');
+        host.className = 'walls';
+        const lanesOf = (w) => Math.max(1, ...w.groups.map((g) => g.chains.length));
+        const rows = s.walls.reduce((n, w) => n + lanesOf(w), 0);
+        // Per wall: heading, processor bars, trunks, box headings and gaps.
+        const fixed = s.walls.reduce((n, w) => n + 28 + 6 + 30 + 10 + 30 + (w.backup ? 40 : 0) + 18, 0) + 40;
+        const avail = view.clientHeight || 900;
+        const lane = Math.min(34, Math.floor((avail - fixed) / rows) - 2);
+        if (lane < 18) {
+          view.className = 'topo-view';
+          host.className = 'wall';
+          return false;
+        }
+        host.style.setProperty('--lane', lane + 'px');
+        for (const w of s.walls) {
+          const box = el('div', { class: 'wall' });
+          box.append(...wallParts(w));
+          host.append(box);
+        }
+        const lg = legend();
+        lg.append(el('span', {}, picked ? 'Tap it again to close the details.' : 'Tap a processor, box or chain for its details.'));
+        host.append(lg);
+        if (picked) drawTopoSide(s.walls.find((w) => w.id === pick.wall));
+        else $('topoSide').className = 'box side none';
+        return true;
+      }
+
+      function legend() {
+        const lg = el('div', { class: 'legend' });
+        for (const [cls, text] of [['ok', 'Driving'], ['standby', 'Standby or loop end'], ['lost', 'Lost']]) {
+          const sp = el('span');
+          sp.append(el('span', { class: 'k ' + cls }), text);
+          lg.append(sp);
+        }
+        return lg;
+      }
+
+      function wallParts(w) {
+        const parts = [];
         const head = el('div', { class: 'wall-head' });
         const pill = el('span', { class: 'pill ' + w.severity });
         pill.append(el('span', { class: 'dot' }), SEV[w.severity]);
         head.append(el('span', { class: 'n' }, w.name), pill, el('span', { class: 'note' }, wallSummary(w)));
-        host.append(head);
+        parts.push(head);
 
         // One grid column per box and one per chain area, with a narrow gap between groups.
         const cols = [];
@@ -503,28 +678,36 @@
           d.append(el('div', { class: 'ln' }));
           return d;
         };
-        grid.append(procBar(w.primary, 1));
+        grid.append(procBar(w.primary, 1, w));
         for (const t of w.trunks) grid.append(trunk(t.fromPrimary, trunkCol(t), 2, t.label));
         w.groups.forEach((g, gi) => {
-          grid.append(xdBox(g, gi, 'left', at[gi].left));
+          grid.append(xdBox(g, gi, 'left', at[gi].left, w));
           const lanes = el('div', { class: 'lanes', style: `grid-column: ${at[gi].lanes}; grid-row: 3` });
           lanes.append(el('div', { class: 'lh' }, g.right ? 'TILE CHAINS · LOOPED' : 'TILE CHAINS'));
-          for (const c of g.chains) lanes.append(lane(c));
+          for (const c of g.chains) lanes.append(lane(c, w));
           grid.append(lanes);
-          if (g.right) grid.append(xdBox(g, gi, 'right', at[gi].right));
+          if (g.right) grid.append(xdBox(g, gi, 'right', at[gi].right, w));
         });
         if (w.backup) {
           for (const t of w.trunks) grid.append(trunk(t.fromBackup ?? 'unknown', trunkCol(t), 4, t.label));
-          grid.append(procBar(w.backup, 5));
+          grid.append(procBar(w.backup, 5, w));
         }
         const sc = el('div', { class: 'topo-scroll' });
         sc.append(grid);
-        host.append(sc);
-        drawTopoSide(w);
+        parts.push(sc);
+        return parts;
       }
 
-      function procBar(p, row) {
-        const b = el('button', { class: 'pbar ' + p.severity + (pick?.kind === 'processor' && pick.id === p.id ? ' sel' : ''), style: `grid-row: ${row}` });
+      // A tap picks something on one wall; a second tap on it clears the pick on a tall screen.
+      const isPick = (w, kind, test) => pick?.kind === kind && pick.wall === w.id && test(pick);
+      function setPick(w, p, same) {
+        pick = same && isTall() ? null : { ...p, wall: w.id };
+        draw();
+      }
+
+      function procBar(p, row, w) {
+        const on = isPick(w, 'processor', (k) => k.id === p.id);
+        const b = el('button', { class: 'pbar ' + p.severity + (on ? ' sel' : ''), style: `grid-row: ${row}` });
         const state = !p.reachable ? 'Offline' : p.driving ? 'Driving the wall' : p.role === 'backup' ? 'Standby' : 'Not driving';
         const sev = !p.reachable ? 'critical' : p.driving ? (p.role === 'backup' ? 'warning' : 'ok') : 'unknown';
         const pill = el('span', { class: 'pill ' + sev });
@@ -532,16 +715,16 @@
         b.append(el('span', { class: 'dot' }), el('span', { class: 'pn' }, p.name));
         if (p.role !== 'single') b.append(el('span', { class: 'tag' }, p.role === 'primary' ? 'PRIMARY' : 'BACKUP'));
         b.append(pill, el('span', { class: 'pm' }, p.summary));
-        b.onclick = () => { pick = { kind: 'processor', id: p.id }; draw(); };
+        b.onclick = () => setPick(w, { kind: 'processor', id: p.id }, on);
         return b;
       }
 
-      function xdBox(g, gi, side, col) {
+      function xdBox(g, gi, side, col, w) {
         const box = g[side];
         const d = el('div', { class: 'xd' + (box.online === false ? ' off' : ''), style: `grid-column: ${col}; grid-row: 3` });
-        const selected = pick?.kind === 'box' && pick.group === gi && pick.side === side;
+        const selected = isPick(w, 'box', (k) => k.group === gi && k.side === side);
         const h = el('button', { class: 'xd-head' + (selected ? ' sel' : '') }, box.name);
-        h.onclick = () => { pick = { kind: 'box', group: gi, side }; draw(); };
+        h.onclick = () => setPick(w, { kind: 'box', group: gi, side }, selected);
         d.append(h);
         for (const c of g.chains) {
           const p = side === 'left' ? c.from : c.to ?? { label: '', state: 'unknown' };
@@ -558,16 +741,19 @@
         return d;
       }
 
-      function lane(c) {
+      function lane(c, w) {
         const end = c.loop === 'broken' ? 'lost' : c.loop === 'none' ? 'none' : 'standby';
-        const b = el('button', { class: `lane ${c.severity === 'warning' || c.severity === 'critical' ? c.severity : ''}${end === 'none' ? ' single' : ''}${pick?.kind === 'chain' && pick.id === c.id ? ' sel' : ''}`, 'aria-label': `Chain ${c.label}, ${c.tileCount} tiles` });
+        const on = isPick(w, 'chain', (k) => k.id === c.id);
+        const b = el('button', { class: `lane ${c.severity === 'warning' || c.severity === 'critical' ? c.severity : ''}${end === 'none' ? ' single' : ''}${on ? ' sel' : ''}`, 'aria-label': `Chain ${c.label}, ${c.tileCount} tiles` });
         b.append(el('span', { class: 'lk ' + c.from.state }));
         const ts = el('span', { class: 'ts' });
         for (const t of c.tiles.slice(0, MAX_TILES)) ts.append(el('i', { class: t.severity }));
         if (c.tileCount > MAX_TILES) ts.append(el('span', { class: 'more' }, `+${c.tileCount - MAX_TILES}`));
         b.append(ts);
+        // With room for it, the tile count of a chain from a saved layout.
+        if (c.tileCount && isTall() && $('wall').classList.contains('walls')) b.append(el('span', { class: 'cnt' }, plural(c.tileCount, 'tile')));
         if (end !== 'none') b.append(el('span', { class: 'lk ' + end }));
-        b.onclick = () => { pick = { kind: 'chain', id: c.id }; draw(); };
+        b.onclick = () => setPick(w, { kind: 'chain', id: c.id }, on);
         return b;
       }
 
@@ -588,13 +774,7 @@
           for (const n of w.notes) side.append(el('p', { class: 'note' }, n));
           side.append(el('p', { class: 'note' }, 'Tap a processor, box or chain for its details.'));
         }
-        const lg = el('div', { class: 'legend' });
-        for (const [cls, text] of [['ok', 'Driving'], ['standby', 'Standby or loop end'], ['lost', 'Lost']]) {
-          const sp = el('span');
-          sp.append(el('span', { class: 'k ' + cls }), text);
-          lg.append(sp);
-        }
-        side.append(lg);
+        side.append(legend());
       }
 
       function pickDetail(w) {
