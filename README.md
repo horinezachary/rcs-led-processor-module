@@ -22,6 +22,13 @@ come from [LEDScreenControl](https://github.com/horinezachary/LEDScreenControl).
   for its details; the header tabs choose the wall on this screen only.
 - **Setup**: processors by address (or found by a network scan), Allow controls, and the alert limits.
 
+On a taller touchscreen (1920×1080) the Overview cards take the full height (one row up to four
+processors, two rows beyond) and add every temperature and fan against its limit, the chains of the
+walls the processor drives (tiles per chain, or port load on COEX), all its alerts and its last few
+events. Input, redundancy, model and address show in full. Processors with alerts come first. Topology
+draws every wall at once, stacked, with taller chain lanes carrying their tile counts; the details
+panel opens only when something is tapped (tap it again to close it). The 1920×440 bar is unchanged.
+
 The web view has the same pages with more detail: every temperature and fan, a temperature chart,
 the controls (brightness slider, presets, input, blackout, freeze, failover, reboot, COEX error count
 reset), the event log with filters, distribution boxes and the processor list with names, order and
